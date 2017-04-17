@@ -32,6 +32,7 @@ cat <<EOCONFIG
 distinguished_name=dn
 [ dn ]
 [ ext ]
+req_extensions = v3_req
 $KEYUSAGELINE
 $CONSTRAINTSLINE
 EOCONFIG
@@ -81,7 +82,7 @@ function generate_csr {
 	local certname="$1"; shift
 	argcheck "$certname" certificate name
 
-	[[ -f "$certname.csr" ]] || openssl req -new -key "$certname.key" -out "$certname.csr"
+	[[ -f "$certname.csr" ]] || openssl req -new -key "$certname.key" -out "$certname.csr" -config <(dump_openssl_conf)
 }
 
 # --- Signing Activities
@@ -268,6 +269,14 @@ case "$action" in
 		;;
 	verify)
 		verify_cert "$1" "$2"
+		;;
+	genkey)
+		generate_key "$@"
+		;;
+	gencsr)
+		set_key_usage_options --allow-signing
+		set_is_ca true
+		generate_csr "$@"
 		;;
 	*)
 		faile 3 "Unrecognized command [$action]"
