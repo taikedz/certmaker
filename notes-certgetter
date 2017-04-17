@@ -1,0 +1,58 @@
+http://vaelen.org/2016/02/05/adding-certificates-to-ubuntu-and-gitlab/
+
+Problem: Token Errors When Authenticating to GitLab
+Token Request Failed
+
+By looking in the Mattermost logs, I saw that the problem was related to the SSL certificate:
+
+sudo tail -f /var/log/gitlab/mattermost/mattermost.log
+
+[2016/02/05 11:15:01 CST] [EROR] /signup/gitlab/complete:AuthorizeOAuthUser code=500 rid=1zh9orjzcfb1tfsmjtj7rekoya uid= ip=192.168.122.160 Token request failed [details: Post https://gitlab.example.com/oauth/token: x509: certificate signed by unknown authority]
+
+The problem is that the GitLab Omnibus comes with its on “cacerts.pem” file, which contains the list of trusted CA root certificates. It probably does this so that it can easily run on a number of different Linux distributions without worrying about the location of those system’s cacerts file.
+Solution Part 1: Importing the Certificate Authority’s Signing Certificate
+
+The first step in solving this problem is to import the signing certificate for the certificate authority into the system’s list of trusted certificates.
+
+To do this, we first need to know what root certificate was used to sign our certificates. We can discover this by examining the certificate with OpenSSL:
+
+openssl x509 -in gitlab.example.com.crt -text -noout
+
+We can look through the output of this command to find the signing certificate’s URL:
+
+Authority Information Access: 
+    OCSP - URI:http://ocsp.entrust.net
+    CA Issuers - URI:http://aia.entrust.net/l1k-chain256.cer
+
+We can then use wget (or curl) to download that certificate:
+
+wget http://aia.entrust.net/l1k-chain256.cer
+
+Then we use OpenSSL to convert it to PEM format:
+
+openssl x509 -inform der -in l1k-chain256.cer -out l1k-chain256.pem
+
+Next we need to place the PEM in /usr/local/share/ca-certificates/:
+
+sudo cp l1k-chain256.pem /usr/local/share/ca-certificates/
+
+Finally, we run the update-ca-certificates utility, which adds the new certificate to the system’s list of trusted certificates.
+
+sudo update-ca-certificates
+
+The output should look something like this:
+
+Updating certificates in /etc/ssl/certs... 1 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d....
+done.
+done.
+
+Solution Part 2: Telling GitLab to Use Ubuntu’s CA Certificate File
+
+The final piece of the puzzle is to tell GitLab to use the system’s trusted certificate file instead of its own. This is done by removing /opt/gitlab/embedded/ssl/certs/cacert.pem and replacing it with a symlink to /etc/ssl/certs/ca-certificates.crt.
+
+sudo rm /opt/gitlab/embedded/ssl/certs/cacert.pem
+sudo ln -s /etc/ssl/certs/ca-certificates.crt /opt/gitlab/embedded/ssl/certs/cacert.pem
+sudo gitlab-ctl reconfigure
+
+That’s it! You should now be able to run both GitLab and Mattermost over HTTPS without an issue.
