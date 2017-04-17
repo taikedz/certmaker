@@ -3,43 +3,6 @@
 # Default number of days a certtificate should be valid for
 defdays=365
 
-# ---- OpenSSL configuration options
-
-CONSTRAINTSLINE=
-KEYUSAGELINE=
-
-function set_is_ca {
-	CONSTRAINTSLINE="basicConstraints=CA:${1},pathlen:0"
-}
-
-function set_key_usage_options {
-	KEYUSAGELINE=""
-	if [[ "$*" =~ --allow-signing ]]; then
-		KEYUSAGELINE="keyUsage=keyCertSign"
-	fi
-}
-
-function dump_openssl_conf {
-
-# if openssl conf is set, the admin is presumed to have configured this
-# themselves -- honour it instead of the custom-set items
-if [[ -f "$OPENSSL_CONF" ]]; then
-	cat "$OPENSSLCONF"
-else
-
-cat <<EOCONFIG
-[req]
-distinguished_name=dn
-[ dn ]
-[ ext ]
-req_extensions = v3_req
-$KEYUSAGELINE
-$CONSTRAINTSLINE
-EOCONFIG
-
-fi
-}
-
 action="$1"; shift
 
 # ---- Generic helpers
@@ -76,18 +39,15 @@ function generate_key {
 }
 
 # Should generate a CSR from a key fo the same name
-# FIXME not sure if this should specify the capabilities it wishes to have at this point
-# and if so, how
 function generate_csr {
 	local certname="$1"; shift
 	argcheck "$certname" certificate name
 
-	[[ -f "$certname.csr" ]] || openssl req -new -key "$certname.key" -out "$certname.csr" -config <(dump_openssl_conf)
+	[[ -f "$certname.csr" ]] || openssl req -new -key "$certname.key" -out "$certname.csr"
 }
 
 # --- Signing Activities
 
-# FIXME fails to sign
 function self_sign_certificate {
 	local certname="$1"; shift
 	local ndays="$1"
@@ -100,10 +60,9 @@ function self_sign_certificate {
 
 	argcheck "$certname" certificate name
 
-	openssl "x509" -extfile <(dump_openssl_conf) -days "$ndays" -in "$certname.csr" -signkey "$certname.key" -out "$certname.crt" || faile $? "Failed to create self-signed certificate"
+	openssl "x509" -days "$ndays" -in "$certname.csr" -signkey "$certname.key" -out "$certname.crt" || faile $? "Failed to create self-signed certificate"
 }
 
-# FIXME depends on resolving self_sign_certificate
 function sign_certificate {
 	local main_key="$1"; shift
 	local subkey="$1"; shift
@@ -118,7 +77,7 @@ function sign_certificate {
 	argcheck "$main_key" signing key
 	argcheck "$subkey" certificate name
 
-	openssl "x509" -req -config <(dump_openssl_conf) -days "$ndays" -in "$subkey.csr" -CAkey "$main_key.key" -out "${subkey}-signed.crt" -CA "${main_key}.crt" -CAcreateserial || faile $? "Failed to sign certificate"
+	openssl "x509" -req -days "$ndays" -in "$subkey.csr" -CAkey "$main_key.key" -out "${subkey}-signed.crt" -CA "${main_key}.crt" -CAcreateserial || faile $? "Failed to sign certificate"
 }
 
 # --- Verification activities
@@ -240,18 +199,12 @@ fi
 case "$action" in
 	create-root-ca)
 
-		# Note - these are overridden if OPENSSL_CONF is set
-		set_key_usage_options --allow-signing
-		set_is_ca true
-
 		generate_key "$1"
 		generate_csr "$1"
 
 		self_sign_certificate "$1" "$2"
 		;;
 	create)
-		set_is_ca false
-
 		generate_key "$1"
 		generate_csr "$1"
 		;;
@@ -274,8 +227,6 @@ case "$action" in
 		generate_key "$@"
 		;;
 	gencsr)
-		set_key_usage_options --allow-signing
-		set_is_ca true
 		generate_csr "$@"
 		;;
 	*)
