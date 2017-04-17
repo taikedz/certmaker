@@ -1,0 +1,40 @@
+mytidbits.com/?p=109
+
+Creating Self signed certificate with keyUsage extensions
+
+You could try using openssl (available in most linux/unix environments) It supports the keyUsage extensions.
+
+e.g. to create a self signed cert, you could use something similar to the following steps:
+
+Locate and edit your openssl configuration /etc/ssl/openssl.cnf, make sure it contains the following lines uncommented:
+
+	req_extensions = v3_req # The extensions to add to a certificate request
+	keyUsage = nonRepudiation, digitalSignature, keyEncipherment, dataEncipherment
+
+Add whatever key usage extensions you need if not already there.
+
+Create private key
+
+	openssl genrsa -des3 -out mytest.key 2048
+
+remove pass phrase - optional
+
+	openssl rsa -in mytest.key -out mytest.nopass.key
+
+create cert signing request for your key
+
+	openssl req -new -key mytest.nopass.key -out mytest.csr -config /etc/ssl/openssl.cnf
+
+Confirm that your requested extensions are in the cert request
+
+	openssl req -text -noout -in mytest.csr
+
+Generate Self signed cert
+
+	openssl x509 -req -days 3650 -in mytest.csr -signkey mytest.nopass.key -out mytest.crt -extensions v3_req -extfile /etc/ssl/openssl.cnf
+
+convert to p12 for browser
+
+	openssl pkcs12 -export -in mytest.crt -inkey mytest.nopass.key -out mytest.p12
+
+Import into browser and check the details…
