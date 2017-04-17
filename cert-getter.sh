@@ -15,6 +15,10 @@ function argcheck {
 	fi
 }
 
+funciton get_cert_info {
+	openssl x509 -text -noout -in "$tmpcert"
+}
+
 function get_issuer_cert {
 # example line -- CA Issuers - URI:http://cert.int-x3.letsencrypt.org/
 }
@@ -41,10 +45,14 @@ add)
 	sudo mkdir "$domaindir" -p
 	sudo mv "$tmpcert" "$domaindir/$domain.crt"
 
+	issuer="$(get_cert_info "$domaindir/$domain.crt"|grep 'CA Issuers - URI:')"
+	if [[ -n "$issuer" ]]; then
+	fi
+
 	sudo dpkg-reconfigure ca-certificates
 	;;
 view)
-	openssl x509 -text -noout -in "$tmpcert"
+	get_cert_info
 	;;
 *)
 	faile Invalid action
