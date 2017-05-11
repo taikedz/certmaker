@@ -2,6 +2,8 @@
 
 A comand line tool for creating and managing certificate signing.
 
+Executables can be found in `bin/`
+
 WORKFLOW
 ========
 
