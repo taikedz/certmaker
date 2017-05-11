@@ -1,11 +1,26 @@
 #!/bin/bash
 
+### Certificate Getter Usage:help
+#
+# Get the certificate of a site and install it to the trusted certs chain
+#
+# 	cert-getter.sh add DOMAIN
+# 	cert-getter.sh view CERTFILE
+#
+# Add the certificate for a HTTPS domain, or view the contents of a certificate file
+#
+# DOMAIN is the domain name to check, by default on port 443
+#
+# You can specify an alternative port, for example
+#
+# 	cert-getter.sh add mydomain.net:8443
+#
+###/doc
+
+#%include bashout.sh autohelp.sh
+
 # Get a certificate for a site
 
-function faile {
-	echo "--- $* ---" >&2
-	exit 1
-}
 
 function argcheck {
 	local arg="$1"; shift

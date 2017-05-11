@@ -1,24 +1,48 @@
 #!/usr/bin/env bash
 
-# Default number of days a certtificate should be valid for
+### Certificate Generation and Signing Tool Usage:help
+# 
+# COMMANDS
+# ========
+# 
+# Create a CA root certificate (should only need to be done once per department) (specify a number of DAYS the certificate will be valid for)
+# 
+# 	docert create-root-ca ca-name [DAYS]
+# 
+# 
+# Create a device/site certificate:
+# 
+# 	docert create device-or-site-name
+# 
+# 
+# Sign a device's CSR to produce its approved certificate (optionally specifying the number of DAYS the certificate should be valid for):
+# 
+# 	docert sign ca-name device-or-site-name [DAYS]
+# 
+# 
+# View a CSR's contents
+# 
+# 	docert viewcsr CSRFILE
+# 
+# 
+# View a Certificate's contents
+# 
+# 	docert viewcert CERTFILE
+# 
+# 
+# Check that a TARGETCERT was signed by a CACERT
+# 
+# 	docert verify CACERT TARGETCERT
+# 
+###/doc
+
+#%include bashout.sh autohelp.sh
+
+# Default number of days a certificate should be valid for
 defdays=365
 
 action="$1"; shift
 
-# ---- Generic helpers
-
-function faile {
-	local errcode="$1"
-
-	if [[ "$errcode" =~ [0-9]+ ]]; then
-		shift
-	else
-		errcode=1
-	fi
-
-	echo "--- $* ---" >&2
-	exit "$errcode"
-}
 
 function argcheck {
 	local item="$1"; shift
@@ -105,49 +129,6 @@ function verify_cert {
 }
 
 argcheck "$action" action
-
-if [[ "$*" =~ --help ]]; then
-cat <<EOF
-
-Certificate Generation and Signing Tool
-
-COMMANDS
-========
-
-Create a CA root certificate (should only need to be done once per department) (specify a number of DAYS the certificate will be valid for)
-
-	docert create-root-ca ca-name [DAYS]
-
-
-Create a device/site certificate:
-
-	docert create device-or-site-name
-
-
-Sign a device's CSR to produce its approved certificate (optionally specifying the number of DAYS the certificate should be valid for):
-
-	docert sign ca-name device-or-site-name [DAYS]
-
-
-View a CSR's contents
-
-	docert viewcsr CSRFILE
-
-
-View a Certificate's contents
-
-	docert viewcert CERTFILE
-
-
-Check that a TARGETCERT was signed by a CACERT
-
-	docert verify CACERT TARGETCERT
-
-
-EOF
-exit 0
-
-fi
 
 case "$action" in
 	create-root-ca)
