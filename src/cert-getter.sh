@@ -17,75 +17,93 @@
 #
 ###/doc
 
-#%include bashout.sh autohelp.sh
-
-# Get a certificate for a site
-
+#%include out.sh autohelp.sh
 
 function argcheck {
 	local arg="$1"; shift
 
-	if [[ -z "$1" ]]; then
-		faile "Please specify $*"
+	if [[ -z "$arg" ]]; then
+		out:fail "Please specify $*"
 	fi
 }
 
-function get_cert_info {
+function view_cert {
+	[[ -f "$1" ]] || out:fail "No such file [$1]"
 	openssl x509 -text -noout -in "$1"
 }
 
-function get_issuer_cert {
-	local issuerline="$1"
-	if [[ -z "$issuerline" ]]; then
+function fetch_cert {
+	local connectstring="$domain"
+
+	if [[ -f "$connectstring" ]]; then
+		echo "$connectstring"
 		return
 	fi
-	: # example line -- CA Issuers - URI:http://cert.int-x3.letsencrypt.org/
-	local CAURI="${issuerline#*URI:}"
-	# May be able to get the CA name by grepping Issuer and finginf the CN= part
-	local caname="$(echo "$CAURI"|md5sum)"
-	local caname="ca-${caname:0:10}.crt" # Same CA, same filename
 
-	# should we check for existing cert that has expired ?
+	if [[ ! "$domain" =~ :[0-9]+$ ]]; then
+		connectstring="$domain:$port"
+	fi
 
-	local bintemp=$(mktemp)
-	wget -q -O "$bintemp" "$CAURI"
-	openssl x509 -inform der -in "$bintemp" -out "$bintemp".pem
-
-	sudo cp "$bintemp".pem "$domaindir/$caname"
+	echo | openssl s_client -servername "$domain" -connect "$connectstring" | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
 }
 
-action="$1"; shift
-domain="$1"; shift
+function determine_port_from_scheme {
+	local scheme="$1"
 
-argcheck "$action" "action (view|add)"
-argcheck "$domain" domain name
+	[[ -n "$scheme" ]] || {
+		port=443
+		return 0
+	}
 
-connectstring="$domain"
-if [[ ! "$domain" =~ :[0-9]+$ ]]; then
-	connectstring="$domain:443"
-fi
+	case "$scheme" in
+	https)
+		port=443 ;;
+	ssh)
+		port=22 ;;
+	ldaps)
+		port=636 ;;
+	ftps)
+		port=990 ;;
+	*)
+		out:fail "Cannot extrapolate port for $scheme" ;;
+	esac
+}
 
-domaindir=/usr/share/ca-certificates/domains
+function get_domain {
+	domain="$target"
+	[[ ! -f "$target" ]] || out:fail "[$target] is a file"
 
-tmpcert="$(mktemp)"
+	# Blat scheme and path
+	if [[ "$domain" =~ ^([a-zA-Z0-9]+):// ]]; then
+		domain="${domain#${BASH_REMATCH[1]}://}"
+		domain="${domain%%/*}"
+	fi
 
-openssl s_client -servername "$domain" -connect "$connectstring" </dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || faile "Could not connect to [$domain]"
+	determine_port_from_scheme "${BASH_REMATCH[1]}"
+}
 
-case "$action" in
-add)
-	sudo mkdir "$domaindir" -p
-	sudo chmod 755 "$domaindir"
-	sudo mv "$tmpcert" "$domaindir/$domain.crt"
-	sudo chmod 644 "$domaindir/$domain.crt"
+main() {
+	autohelp:check "$@"
 
-	get_issuer_cert "$(get_cert_info "$domaindir/$domain.crt"|grep 'CA Issuers - URI:')"
+	local action="$1"; shift
+	local target="$1"; shift
 
-	sudo dpkg-reconfigure ca-certificates
-	;;
-view)
-	get_cert_info "$tmpcert"
-	;;
-*)
-	faile Invalid action
-	;;
-esac
+	argcheck "$action" "action (view|fetch)"
+	argcheck "$target" "URL or cert file"
+
+	case "$action" in
+	fetch)
+		get_domain
+		tmpcert="${domain}-fetched.cer"
+		fetch_cert
+		;;
+	view)
+		view_cert "$target"
+		;;
+	*)
+		out:fail Invalid action
+		;;
+	esac
+}
+
+main "$@"

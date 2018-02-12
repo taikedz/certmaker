@@ -1,0 +1,9 @@
+One problem I have is that it seems any Cert geenrated seems to be able to sign other people's requests
+
+There's some notes here
+
+https://superuser.com/questions/462295/openssl-ca-and-non-ca-certificate
+
+The other question is that some clients need the full trust chain to be returned by the server
+
+How do we generate this full chain ?
