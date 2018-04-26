@@ -2,31 +2,29 @@
 
 ### Certificate Getter Usage:help
 #
-# Get the certificate of a site and install it to the trusted certs chain
+#     cert-getter.sh fetch [SCHEME://]DOMAIN[:PORT]
+#     cert-getter.sh view CERTFILE
 #
-# 	cert-getter.sh add DOMAIN
-# 	cert-getter.sh view CERTFILE
-#
-# Add the certificate for a HTTPS domain, or view the contents of a certificate file
+# Fetch the certificate for a HTTPS domain to a file, or view the contents of a certificate file
 #
 # DOMAIN is the domain name to check, by default on port 443
 #
 # You can specify an alternative port, for example
 #
-# 	cert-getter.sh add mydomain.net:8443
+#     cert-getter.sh fetch mydomain.net:8443
 #
 ###/doc
 
-#!/bin/bash
+##bash-libs: out.sh @ 75ff4139 (1.1)
 
-#!/bin/bash
+##bash-libs: colours.sh @ 75ff4139 (1.1)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
 #
 # Example:
 # 	
-# 	echo -e "${CRED}Some red text ${CBBLU} some blue text $CDEF some text in the terminal's default colour"
+# 	echo -e "${CRED}Some red text ${CBBLU} some blue text $CDEF some text in the terminal's default colour")
 #
 # Requires processing of escape characters.
 #
@@ -44,30 +42,104 @@
 #
 # Note that highlight and underline must be applied or re-applied after specifying a colour.
 #
+# If the session is detected as being in a pipe, colours will be turned off.
+#   You can override this by calling `colours:check --color=always` at the start of your script
+#
 ###/doc
 
-export CRED="\033[0;31m"
-export CGRN="\033[0;32m"
-export CYEL="\033[0;33m"
-export CBLU="\033[0;34m"
-export CPUR="\033[0;35m"
-export CTEA="\033[0;36m"
+##bash-libs: tty.sh @ 75ff4139 (1.1)
 
-export CBRED="\033[1;31m"
-export CBGRN="\033[1;32m"
-export CBYEL="\033[1;33m"
-export CBBLU="\033[1;34m"
-export CBPUR="\033[1;35m"
-export CBTEA="\033[1;36m"
+tty:is_ssh() {
+    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
+}
 
-export HLRED="\033[41m"
-export HLGRN="\033[42m"
-export HLYEL="\033[43m"
-export HLBLU="\033[44m"
-export HLPUR="\033[45m"
-export HLTEA="\033[46m"
+tty:is_pipe() {
+    [[ ! -t 1 ]]
+}
 
-export CDEF="\033[0m"
+### colours:check ARGS Usage:bbuild
+#
+# Check the args to see if there's a `--color=always` or `--color=never`
+#   and reload the colours appropriately
+#
+###/doc
+colours:check() {
+    if [[ "$*" =~ --color=always ]]; then
+        COLOURS_ON=true
+    elif [[ "$*" =~ --color=never ]]; then
+        COLOURS_ON=false
+    fi
+
+    colours:define
+    return 0
+}
+
+colours:auto() {
+    if tty:is_pipe ; then
+        COLOURS_ON=false
+    else
+        COLOURS_ON=true
+    fi
+
+    colours:define
+    return 0
+}
+
+colours:define() {
+    if [[ "$COLOURS_ON" = false ]]; then
+
+        export CRED=''
+        export CGRN=''
+        export CYEL=''
+        export CBLU=''
+        export CPUR=''
+        export CTEA=''
+
+        export CBRED=''
+        export CBGRN=''
+        export CBYEL=''
+        export CBBLU=''
+        export CBPUR=''
+        export CBTEA=''
+
+        export HLRED=''
+        export HLGRN=''
+        export HLYEL=''
+        export HLBLU=''
+        export HLPUR=''
+        export HLTEA=''
+
+        export CDEF=''
+
+    else
+
+        export CRED=$(echo -e "\033[0;31m")
+        export CGRN=$(echo -e "\033[0;32m")
+        export CYEL=$(echo -e "\033[0;33m")
+        export CBLU=$(echo -e "\033[0;34m")
+        export CPUR=$(echo -e "\033[0;35m")
+        export CTEA=$(echo -e "\033[0;36m")
+
+        export CBRED=$(echo -e "\033[1;31m")
+        export CBGRN=$(echo -e "\033[1;32m")
+        export CBYEL=$(echo -e "\033[1;33m")
+        export CBBLU=$(echo -e "\033[1;34m")
+        export CBPUR=$(echo -e "\033[1;35m")
+        export CBTEA=$(echo -e "\033[1;36m")
+
+        export HLRED=$(echo -e "\033[41m")
+        export HLGRN=$(echo -e "\033[42m")
+        export HLYEL=$(echo -e "\033[43m")
+        export HLBLU=$(echo -e "\033[44m")
+        export HLPUR=$(echo -e "\033[45m")
+        export HLTEA=$(echo -e "\033[46m")
+
+        export CDEF=$(echo -e "\033[0m")
+
+    fi
+}
+
+colours:auto
 
 ### Console output handlers Usage:bbuild
 #
@@ -87,7 +159,7 @@ export CDEF="\033[0m"
 
 # Internal
 function out:buffer_initialize {
-	OUTPUT_BUFFER_defer=(:)
+    OUTPUT_BUFFER_defer=(:)
 }
 out:buffer_initialize
 
@@ -96,30 +168,49 @@ out:buffer_initialize
 # only prints if MODE_DEBUG is set to "true"
 ###/doc
 function out:debug {
-	if [[ "$MODE_DEBUG" = true ]]; then
-		echo -e "${CBBLU}DEBUG: $CBLU$*$CDEF" 1>&2
-	fi
+    if [[ "$MODE_DEBUG" = true ]]; then
+        echo "${CBBLU}DEBUG: $CBLU$*$CDEF" 1>&2
+    fi
+}
+
+### out:debug:fork [MARKER] Usage:bbuild
+#
+# Pipe the data coming through stdin to stdout
+#
+# If debug mode is on, *also* write the same data to stderr, each line preceded by MARKER
+#
+# Insert this debug fork into pipes to see their output
+#
+###/doc
+function out:debug:fork {
+    if [[ "$MODE_DEBUG" = true ]]; then
+        local MARKER="${1:-DEBUG: }"; shift || :
+
+        cat - | sed -r "s/^/$MARKER/" | tee -a /dev/stderr
+    else
+        cat -
+    fi
 }
 
 ### out:info MESSAGE Usage:bbuild
 # print a green informational message to stderr
 ###/doc
 function out:info {
-	echo -e "$CGRN$*$CDEF" 1>&2
+    echo "$CGRN$*$CDEF" 1>&2
 }
 
 ### out:warn MESSAGE Usage:bbuild
 # print a yellow warning message to stderr
 ###/doc
 function out:warn {
-	echo -e "${CBYEL}WARN: $CYEL$*$CDEF" 1>&2
+    echo "${CBYEL}WARN: $CYEL$*$CDEF" 1>&2
 }
 
 ### out:defer MESSAGE Usage:bbuild
 # Store a message in the output buffer for later use
 ###/doc
 function out:defer {
-	OUTPUT_BUFFER_defer[${#OUTPUT_BUFFER_defer[@]}]="$*"
+    OUTPUT_BUFFER_defer[${#OUTPUT_BUFFER_defer[@]}]="$*"
 }
 
 ### out:flush HANDLER ... Usage:bbuild
@@ -138,15 +229,15 @@ function out:defer {
 #
 ###/doc
 function out:flush {
-	[[ -n "$*" ]] || out:fail "Did not provide a command for buffered output\n\n${OUTPUT_BUFFER_defer[*]}"
+    [[ -n "$*" ]] || out:fail "Did not provide a command for buffered output\n\n${OUTPUT_BUFFER_defer[*]}"
 
-	[[ "${#OUTPUT_BUFFER_defer[@]}" -gt 1 ]] || return
+    [[ "${#OUTPUT_BUFFER_defer[@]}" -gt 1 ]] || return 0
 
-	for buffer_line in "${OUTPUT_BUFFER_defer[@]:1}"; do
-		"$@" "$buffer_line"
-	done
+    for buffer_line in "${OUTPUT_BUFFER_defer[@]:1}"; do
+        "$@" "$buffer_line"
+    done
 
-	out:buffer_initialize
+    out:buffer_initialize
 }
 
 ### out:fail [CODE] MESSAGE Usage:bbuild
@@ -155,15 +246,15 @@ function out:flush {
 # if no code is specified, error code 127 is used
 ###/doc
 function out:fail {
-	local ERCODE=127
-	local numpat='^[0-9]+$'
+    local ERCODE=127
+    local numpat='^[0-9]+$'
 
-	if [[ "$1" =~ $numpat ]]; then
-		ERCODE="$1"; shift
-	fi
+    if [[ "$1" =~ $numpat ]]; then
+        ERCODE="$1"; shift || :
+    fi
 
-	echo -e "${CBRED}ERROR FAIL: $CRED$*$CDEF" 1>&2
-	exit $ERCODE
+    echo "${CBRED}ERROR FAIL: $CRED$*$CDEF" 1>&2
+    exit $ERCODE
 }
 
 ### out:error MESSAGE Usage:bbuild
@@ -172,7 +263,7 @@ function out:fail {
 # unlike out:fail, does not cause script exit
 ###/doc
 function out:error {
-	echo -e "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
+    echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
 
 ### out:dump Usage:bbuild
@@ -186,10 +277,10 @@ function out:error {
 ###/doc
 
 function out:dump {
-	echo -e -n "${CBPUR}$*" 1>&2
-	echo -e -n "$CPUR" 1>&2
-	cat - 1>&2
-	echo -e -n "$CDEF" 1>&2
+    echo -n "${CBPUR}$*" 1>&2
+    echo -n "$CPUR" 1>&2
+    cat - 1>&2
+    echo -n "$CDEF" 1>&2
 }
 
 ### out:break MESSAGE Usage:bbuild
@@ -208,18 +299,19 @@ function out:dump {
 ###/doc
 
 function out:break {
-	[[ "$MODE_DEBUG" = true ]] || return
+    [[ "$MODE_DEBUG" = true ]] || return 0
 
-	read -p "${CRED}BREAKPOINT: $* >$CDEF " >&2
-	if [[ "$REPLY" =~ quit|exit|stop ]]; then
-		out:fail "ABORT"
-	fi
+    echo -en "${CRED}BREAKPOINT: $* >$CDEF " >&2
+    read
+    if [[ "$REPLY" =~ quit|exit|stop ]]; then
+        out:fail "ABORT"
+    fi
 }
 
 if [[ "$MODE_DEBUG_VERBOSE" = true ]]; then
-	set -x
+    set -x
 fi
-#!/bin/bash
+##bash-libs: autohelp.sh @ 75ff4139 (1.1)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -230,14 +322,14 @@ fi
 #
 # A help comment looks like this:
 #
-#	### <title> Usage:help
-#	#
-#	# <some content>
-#	#
-#	# end with "###/doc" on its own line (whitespaces before
-#	# and after are OK)
-#	#
-#	###/doc
+#    ### <title> Usage:help
+#    #
+#    # <some content>
+#    #
+#    # end with "###/doc" on its own line (whitespaces before
+#    # and after are OK)
+#    #
+#    ###/doc
 #
 # You can set a different help section by specifying a subsection
 #
@@ -258,10 +350,10 @@ fi
 HELPCHAR='#'
 
 function autohelp:print {
-	local SECTION_STRING="${1:-}"; shift
-	local TARGETFILE="${1:-}"; shift
-	[[ -n "$SECTION_STRING" ]] || SECTION_STRING=help
-	[[ -n "$TARGETFILE" ]] || TARGETFILE="$0"
+    local SECTION_STRING="${1:-}"; shift || :
+    local TARGETFILE="${1:-}"; shift || :
+    [[ -n "$SECTION_STRING" ]] || SECTION_STRING=help
+    [[ -n "$TARGETFILE" ]] || TARGETFILE="$0"
 
         echo -e "\n$(basename "$TARGETFILE")\n===\n"
         local SECSTART='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$SECTION_STRING"'\s*$'
@@ -277,7 +369,7 @@ function autohelp:print {
                         if [[ "$secline" =~ $SECEND ]]; then
                                 insec=false
                         else
-				echo "$secline" | sed -r "s/^\s*$HELPCHAR//g"
+                echo "$secline" | sed -r "s/^\s*$HELPCHAR//g"
                         fi
                 fi
         done < "$TARGETFILE"
@@ -285,7 +377,7 @@ function autohelp:print {
         if [[ "$insec" = true ]]; then
                 echo "WARNING: Non-terminated help block." 1>&2
         fi
-	echo ""
+    echo ""
 }
 
 ### autohelp:paged Usage:bbuild
@@ -294,8 +386,8 @@ function autohelp:print {
 #
 ###/doc
 function autohelp:paged {
-	: ${PAGER=less}
-	autohelp:print "$@" | $PAGER
+    : ${PAGER=less}
+    autohelp:print "$@" | $PAGER
 }
 
 ### autohelp:check Usage:bbuild
@@ -304,118 +396,123 @@ function autohelp:paged {
 #
 # Example use:
 #
-#	#!/bin/bash
+#    #!/bin/bash
 #
-#	### Some help Usage:help
-#	#
-#	# Some help text
-#	#
-#	###/doc
+#    ### Some help Usage:help
+#    #
+#    # Some help text
+#    #
+#    ###/doc
 #
-#	#%include autohelp.sh
+#    #%include autohelp.sh
 #
-#	main() {
-#		autohelp:check "$@"
+#    main() {
+#        autohelp:check "$@"
 #
-#		# now add your code
-#	}
+#        # now add your code
+#    }
 #
-#	main "$@"
+#    main "$@"
 #
 ###/doc
 autohelp:check() {
-	if [[ "$*" =~ --help ]]; then
-		cols="$(tput cols)"
-		autohelp:print | fold -w "$cols" -s || autohelp:print
-		exit 0
-	fi
+    if [[ "$*" =~ --help ]]; then
+        cols="$(tput cols)"
+        autohelp:print | fold -w "$cols" -s || autohelp:print
+        exit 0
+    fi
 }
 
 function argcheck {
-	local arg="$1"; shift
+    local arg="$1"; shift
 
-	if [[ -z "$arg" ]]; then
-		out:fail "Please specify $*"
-	fi
+    if [[ -z "$arg" ]]; then
+        out:fail "Please specify $*"
+    fi
 }
 
 function view_cert {
-	[[ -f "$1" ]] || out:fail "No such file [$1]"
-	openssl x509 -text -noout -in "$1"
+    [[ -f "$1" ]] || out:fail "No such file [$1]"
+    openssl x509 -text -noout -in "$1"
 }
 
 function fetch_cert {
-	local connectstring="$domain"
+    local connectstring="$domain:$port"
 
-	if [[ -f "$connectstring" ]]; then
-		echo "$connectstring"
-		return
-	fi
+    if [[ -f "$connectstring" ]]; then
+        echo "$connectstring"
+        return
+    fi
 
-	if [[ ! "$domain" =~ :[0-9]+$ ]]; then
-		connectstring="$domain:$port"
-	fi
-
-	echo | openssl s_client -servername "$domain" -connect "$connectstring" | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
+    echo | (set -x ; openssl s_client -servername "$domain" -connect "$connectstring" ) | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
 }
 
 function determine_port_from_scheme {
-	local scheme="$1"
+    [[ -n "${scheme:-}" ]] || {
+        port=443
+        return 0
+    }
 
-	[[ -n "$scheme" ]] || {
-		port=443
-		return 0
-	}
-
-	case "$scheme" in
-	https)
-		port=443 ;;
-	ssh)
-		port=22 ;;
-	ldaps)
-		port=636 ;;
-	ftps)
-		port=990 ;;
-	*)
-		out:fail "Cannot extrapolate port for $scheme" ;;
-	esac
+    case "$scheme" in
+    https)
+        port=443 ;;
+    ssh)
+        port=22 ;;
+    ldaps)
+        port=636 ;;
+    ftps)
+        port=990 ;;
+    *)
+        out:fail "Cannot extrapolate port for $scheme" ;;
+    esac
 }
 
-function get_domain {
-	domain="$target"
-	[[ ! -f "$target" ]] || out:fail "[$target] is a file"
+function get_port() {
+    if [[ "$domain" =~ ^(.+?):([0-9]+)$ ]]; then
+        port="${BASH_REMATCH[2]}"
+        domain="${BASH_REMATCH[1]}"
+    fi
 
-	# Blat scheme and path
-	if [[ "$domain" =~ ^([a-zA-Z0-9]+):// ]]; then
-		domain="${domain#${BASH_REMATCH[1]}://}"
-		domain="${domain%%/*}"
-	fi
+    if [[ -z "${port:-}" ]]; then
+        determine_port_from_scheme
+    fi
+}
 
-	determine_port_from_scheme "${BASH_REMATCH[1]}"
+function get_domain_and_scheme {
+    domain="$target"
+    [[ ! -f "$target" ]] || out:fail "[$target] is a file"
+
+    # Blat scheme and path
+    if [[ "$domain" =~ ^([a-zA-Z0-9]+):// ]]; then
+        scheme="${BASH_REMATCH[1]}"
+        domain="${domain#$scheme://}"
+        domain="${domain%%/*}"
+    fi
 }
 
 main() {
-	autohelp:check "$@"
+    autohelp:check "$@"
 
-	local action="$1"; shift
-	local target="$1"; shift
+    local action="$1"; shift
+    local target="$1"; shift
 
-	argcheck "$action" "action (view|fetch)"
-	argcheck "$target" "URL or cert file"
+    argcheck "$action" "action (view|fetch)"
+    argcheck "$target" "URL or cert file"
 
-	case "$action" in
-	fetch)
-		get_domain
-		tmpcert="${domain}-fetched.cer"
-		fetch_cert
-		;;
-	view)
-		view_cert "$target"
-		;;
-	*)
-		out:fail Invalid action
-		;;
-	esac
+    case "$action" in
+    fetch)
+        get_domain_and_scheme
+        get_port
+        tmpcert="${domain}-fetched.cer"
+        fetch_cert
+        ;;
+    view)
+        view_cert "$target"
+        ;;
+    *)
+        out:fail Invalid action
+        ;;
+    esac
 }
 
 main "$@"

@@ -32,16 +32,16 @@
 #
 ###/doc
 
-#!/bin/bash
+##bash-libs: out.sh @ 75ff4139 (1.1)
 
-#!/bin/bash
+##bash-libs: colours.sh @ 75ff4139 (1.1)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
 #
 # Example:
 # 	
-# 	echo -e "${CRED}Some red text ${CBBLU} some blue text $CDEF some text in the terminal's default colour"
+# 	echo -e "${CRED}Some red text ${CBBLU} some blue text $CDEF some text in the terminal's default colour")
 #
 # Requires processing of escape characters.
 #
@@ -59,30 +59,104 @@
 #
 # Note that highlight and underline must be applied or re-applied after specifying a colour.
 #
+# If the session is detected as being in a pipe, colours will be turned off.
+#   You can override this by calling `colours:check --color=always` at the start of your script
+#
 ###/doc
 
-export CRED="\033[0;31m"
-export CGRN="\033[0;32m"
-export CYEL="\033[0;33m"
-export CBLU="\033[0;34m"
-export CPUR="\033[0;35m"
-export CTEA="\033[0;36m"
+##bash-libs: tty.sh @ 75ff4139 (1.1)
 
-export CBRED="\033[1;31m"
-export CBGRN="\033[1;32m"
-export CBYEL="\033[1;33m"
-export CBBLU="\033[1;34m"
-export CBPUR="\033[1;35m"
-export CBTEA="\033[1;36m"
+tty:is_ssh() {
+    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
+}
 
-export HLRED="\033[41m"
-export HLGRN="\033[42m"
-export HLYEL="\033[43m"
-export HLBLU="\033[44m"
-export HLPUR="\033[45m"
-export HLTEA="\033[46m"
+tty:is_pipe() {
+    [[ ! -t 1 ]]
+}
 
-export CDEF="\033[0m"
+### colours:check ARGS Usage:bbuild
+#
+# Check the args to see if there's a `--color=always` or `--color=never`
+#   and reload the colours appropriately
+#
+###/doc
+colours:check() {
+    if [[ "$*" =~ --color=always ]]; then
+        COLOURS_ON=true
+    elif [[ "$*" =~ --color=never ]]; then
+        COLOURS_ON=false
+    fi
+
+    colours:define
+    return 0
+}
+
+colours:auto() {
+    if tty:is_pipe ; then
+        COLOURS_ON=false
+    else
+        COLOURS_ON=true
+    fi
+
+    colours:define
+    return 0
+}
+
+colours:define() {
+    if [[ "$COLOURS_ON" = false ]]; then
+
+        export CRED=''
+        export CGRN=''
+        export CYEL=''
+        export CBLU=''
+        export CPUR=''
+        export CTEA=''
+
+        export CBRED=''
+        export CBGRN=''
+        export CBYEL=''
+        export CBBLU=''
+        export CBPUR=''
+        export CBTEA=''
+
+        export HLRED=''
+        export HLGRN=''
+        export HLYEL=''
+        export HLBLU=''
+        export HLPUR=''
+        export HLTEA=''
+
+        export CDEF=''
+
+    else
+
+        export CRED=$(echo -e "\033[0;31m")
+        export CGRN=$(echo -e "\033[0;32m")
+        export CYEL=$(echo -e "\033[0;33m")
+        export CBLU=$(echo -e "\033[0;34m")
+        export CPUR=$(echo -e "\033[0;35m")
+        export CTEA=$(echo -e "\033[0;36m")
+
+        export CBRED=$(echo -e "\033[1;31m")
+        export CBGRN=$(echo -e "\033[1;32m")
+        export CBYEL=$(echo -e "\033[1;33m")
+        export CBBLU=$(echo -e "\033[1;34m")
+        export CBPUR=$(echo -e "\033[1;35m")
+        export CBTEA=$(echo -e "\033[1;36m")
+
+        export HLRED=$(echo -e "\033[41m")
+        export HLGRN=$(echo -e "\033[42m")
+        export HLYEL=$(echo -e "\033[43m")
+        export HLBLU=$(echo -e "\033[44m")
+        export HLPUR=$(echo -e "\033[45m")
+        export HLTEA=$(echo -e "\033[46m")
+
+        export CDEF=$(echo -e "\033[0m")
+
+    fi
+}
+
+colours:auto
 
 ### Console output handlers Usage:bbuild
 #
@@ -102,7 +176,7 @@ export CDEF="\033[0m"
 
 # Internal
 function out:buffer_initialize {
-	OUTPUT_BUFFER_defer=(:)
+    OUTPUT_BUFFER_defer=(:)
 }
 out:buffer_initialize
 
@@ -111,30 +185,49 @@ out:buffer_initialize
 # only prints if MODE_DEBUG is set to "true"
 ###/doc
 function out:debug {
-	if [[ "$MODE_DEBUG" = true ]]; then
-		echo -e "${CBBLU}DEBUG: $CBLU$*$CDEF" 1>&2
-	fi
+    if [[ "$MODE_DEBUG" = true ]]; then
+        echo "${CBBLU}DEBUG: $CBLU$*$CDEF" 1>&2
+    fi
+}
+
+### out:debug:fork [MARKER] Usage:bbuild
+#
+# Pipe the data coming through stdin to stdout
+#
+# If debug mode is on, *also* write the same data to stderr, each line preceded by MARKER
+#
+# Insert this debug fork into pipes to see their output
+#
+###/doc
+function out:debug:fork {
+    if [[ "$MODE_DEBUG" = true ]]; then
+        local MARKER="${1:-DEBUG: }"; shift || :
+
+        cat - | sed -r "s/^/$MARKER/" | tee -a /dev/stderr
+    else
+        cat -
+    fi
 }
 
 ### out:info MESSAGE Usage:bbuild
 # print a green informational message to stderr
 ###/doc
 function out:info {
-	echo -e "$CGRN$*$CDEF" 1>&2
+    echo "$CGRN$*$CDEF" 1>&2
 }
 
 ### out:warn MESSAGE Usage:bbuild
 # print a yellow warning message to stderr
 ###/doc
 function out:warn {
-	echo -e "${CBYEL}WARN: $CYEL$*$CDEF" 1>&2
+    echo "${CBYEL}WARN: $CYEL$*$CDEF" 1>&2
 }
 
 ### out:defer MESSAGE Usage:bbuild
 # Store a message in the output buffer for later use
 ###/doc
 function out:defer {
-	OUTPUT_BUFFER_defer[${#OUTPUT_BUFFER_defer[@]}]="$*"
+    OUTPUT_BUFFER_defer[${#OUTPUT_BUFFER_defer[@]}]="$*"
 }
 
 ### out:flush HANDLER ... Usage:bbuild
@@ -153,15 +246,15 @@ function out:defer {
 #
 ###/doc
 function out:flush {
-	[[ -n "$*" ]] || out:fail "Did not provide a command for buffered output\n\n${OUTPUT_BUFFER_defer[*]}"
+    [[ -n "$*" ]] || out:fail "Did not provide a command for buffered output\n\n${OUTPUT_BUFFER_defer[*]}"
 
-	[[ "${#OUTPUT_BUFFER_defer[@]}" -gt 1 ]] || return
+    [[ "${#OUTPUT_BUFFER_defer[@]}" -gt 1 ]] || return 0
 
-	for buffer_line in "${OUTPUT_BUFFER_defer[@]:1}"; do
-		"$@" "$buffer_line"
-	done
+    for buffer_line in "${OUTPUT_BUFFER_defer[@]:1}"; do
+        "$@" "$buffer_line"
+    done
 
-	out:buffer_initialize
+    out:buffer_initialize
 }
 
 ### out:fail [CODE] MESSAGE Usage:bbuild
@@ -170,15 +263,15 @@ function out:flush {
 # if no code is specified, error code 127 is used
 ###/doc
 function out:fail {
-	local ERCODE=127
-	local numpat='^[0-9]+$'
+    local ERCODE=127
+    local numpat='^[0-9]+$'
 
-	if [[ "$1" =~ $numpat ]]; then
-		ERCODE="$1"; shift
-	fi
+    if [[ "$1" =~ $numpat ]]; then
+        ERCODE="$1"; shift || :
+    fi
 
-	echo -e "${CBRED}ERROR FAIL: $CRED$*$CDEF" 1>&2
-	exit $ERCODE
+    echo "${CBRED}ERROR FAIL: $CRED$*$CDEF" 1>&2
+    exit $ERCODE
 }
 
 ### out:error MESSAGE Usage:bbuild
@@ -187,7 +280,7 @@ function out:fail {
 # unlike out:fail, does not cause script exit
 ###/doc
 function out:error {
-	echo -e "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
+    echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
 
 ### out:dump Usage:bbuild
@@ -201,10 +294,10 @@ function out:error {
 ###/doc
 
 function out:dump {
-	echo -e -n "${CBPUR}$*" 1>&2
-	echo -e -n "$CPUR" 1>&2
-	cat - 1>&2
-	echo -e -n "$CDEF" 1>&2
+    echo -n "${CBPUR}$*" 1>&2
+    echo -n "$CPUR" 1>&2
+    cat - 1>&2
+    echo -n "$CDEF" 1>&2
 }
 
 ### out:break MESSAGE Usage:bbuild
@@ -223,18 +316,21 @@ function out:dump {
 ###/doc
 
 function out:break {
-	[[ "$MODE_DEBUG" = true ]] || return
+    [[ "$MODE_DEBUG" = true ]] || return 0
 
-	read -p "${CRED}BREAKPOINT: $* >$CDEF " >&2
-	if [[ "$REPLY" =~ quit|exit|stop ]]; then
-		out:fail "ABORT"
-	fi
+    echo -en "${CRED}BREAKPOINT: $* >$CDEF " >&2
+    read
+    if [[ "$REPLY" =~ quit|exit|stop ]]; then
+        out:fail "ABORT"
+    fi
 }
 
 if [[ "$MODE_DEBUG_VERBOSE" = true ]]; then
-	set -x
+    set -x
 fi
-#!/bin/bash
+##bash-libs: args.sh @ 75ff4139 (1.1)
+
+##bash-libs: patterns.sh @ 75ff4139 (1.1)
 
 ### Useful patterns Usage:bbuild
 #
@@ -289,53 +385,53 @@ export PAT_email="$PAT_filename@$PAT_filename.$PAT_cvar"
 ###/doc
 
 function args:get {
-	local seek="$1"; shift
+    local seek="$1"; shift || :
 
-	if [[ "$seek" =~ $PAT_num ]]; then
-		local arguments=("$@")
+    if [[ "$seek" =~ $PAT_num ]]; then
+        local arguments=("$@")
 
-		# Get the index starting at 1
-		local n=$((seek-1))
-		# but do not affect wrap-arounds
-		[[ "$n" -ge 0 ]] || n=$((n+1))
+        # Get the index starting at 1
+        local n=$((seek-1))
+        # but do not affect wrap-arounds
+        [[ "$n" -ge 0 ]] || n=$((n+1))
 
-		echo "${arguments[$n]}"
+        echo "${arguments[$n]}"
 
-	elif [[ "$seek" =~ ^--.+ ]]; then
-		args:get_long "$seek" "$@"
+    elif [[ "$seek" =~ ^--.+ ]]; then
+        args:get_long "$seek" "$@"
 
-	elif [[ "$seek" =~ ^-[a-zA-Z0-9]$ ]]; then
-		args:get_short "$seek" "$@"
+    elif [[ "$seek" =~ ^-[a-zA-Z0-9]$ ]]; then
+        args:get_short "$seek" "$@"
 
-	else
-		return 1
-	fi
+    else
+        return 1
+    fi
 }
 
 function args:get_short {
-	local token="$1"; shift
-	while [[ -n "$*" ]]; do
-		local item="$1"; shift
+    local token="$1"; shift || :
+    while [[ -n "$*" ]]; do
+        local item="$1"; shift || :
 
-		if [[ "$item" = "$token" ]]; then
-			echo "$1"
-			return
-		fi
-	done
-	return 1
+        if [[ "$item" = "$token" ]]; then
+            echo "$1"
+            return 0
+        fi
+    done
+    return 1
 }
 
 function args:get_long {
-	local token="$1"; shift
-	local tokenpat="^$token=(.*)$"
+    local token="$1"; shift || :
+    local tokenpat="^$token=(.*)$"
 
-	for item in "$@"; do
-		if [[ "$item" =~ $tokenpat ]]; then
-			echo "${BASH_REMATCH[1]}"
-			return
-		fi
-	done
-	return 1
+    for item in "$@"; do
+        if [[ "$item" =~ $tokenpat ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 ### args:has TOKEN ARGS ... Usage:bbuild
@@ -359,20 +455,20 @@ function args:get_long {
 ###/doc
 
 function args:has {
-	local token="$1"; shift
-	for item in "$@"; do
-		if [[ "$token" = "$item" ]]; then
-			return 0
-		fi
-	done
-	return 1
+    local token="$1"; shift || :
+    for item in "$@"; do
+        if [[ "$token" = "$item" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 ### args:after TOKEN ARGS ... Usage:bbuild
 #
 # Return all tokens after TOKEN via the RETARR_ARGSAFTER
 #
-#	myargs=(one two -- three "four and" five)
+#    myargs=(one two -- three "four and" five)
 # 	args:after -- "${myargs[@]}"
 #
 # 	for a in "${RETARR_ARGSAFTER}"; do
@@ -388,16 +484,16 @@ function args:has {
 ###/doc
 
 function args:after {
-	local token="$1"; shift
-	
-	local current_token="$1"; shift
-	while [[ "$#" -gt 0 ]] && [[ "$current_token" != "$token" ]]; do
-		current_token="$1"; shift
-	done
+    local token="$1"; shift || :
+    
+    local current_token="$1"; shift || :
+    while [[ "$#" -gt 0 ]] && [[ "$current_token" != "$token" ]]; do
+        current_token="$1"; shift || :
+    done
 
-	RETARR_ARGSAFTER=("$@")
+    RETARR_ARGSAFTER=("$@")
 }
-#!/bin/bash
+##bash-libs: autohelp.sh @ 75ff4139 (1.1)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -408,14 +504,14 @@ function args:after {
 #
 # A help comment looks like this:
 #
-#	### <title> Usage:help
-#	#
-#	# <some content>
-#	#
-#	# end with "###/doc" on its own line (whitespaces before
-#	# and after are OK)
-#	#
-#	###/doc
+#    ### <title> Usage:help
+#    #
+#    # <some content>
+#    #
+#    # end with "###/doc" on its own line (whitespaces before
+#    # and after are OK)
+#    #
+#    ###/doc
 #
 # You can set a different help section by specifying a subsection
 #
@@ -436,10 +532,10 @@ function args:after {
 HELPCHAR='#'
 
 function autohelp:print {
-	local SECTION_STRING="${1:-}"; shift
-	local TARGETFILE="${1:-}"; shift
-	[[ -n "$SECTION_STRING" ]] || SECTION_STRING=help
-	[[ -n "$TARGETFILE" ]] || TARGETFILE="$0"
+    local SECTION_STRING="${1:-}"; shift || :
+    local TARGETFILE="${1:-}"; shift || :
+    [[ -n "$SECTION_STRING" ]] || SECTION_STRING=help
+    [[ -n "$TARGETFILE" ]] || TARGETFILE="$0"
 
         echo -e "\n$(basename "$TARGETFILE")\n===\n"
         local SECSTART='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$SECTION_STRING"'\s*$'
@@ -455,7 +551,7 @@ function autohelp:print {
                         if [[ "$secline" =~ $SECEND ]]; then
                                 insec=false
                         else
-				echo "$secline" | sed -r "s/^\s*$HELPCHAR//g"
+                echo "$secline" | sed -r "s/^\s*$HELPCHAR//g"
                         fi
                 fi
         done < "$TARGETFILE"
@@ -463,7 +559,7 @@ function autohelp:print {
         if [[ "$insec" = true ]]; then
                 echo "WARNING: Non-terminated help block." 1>&2
         fi
-	echo ""
+    echo ""
 }
 
 ### autohelp:paged Usage:bbuild
@@ -472,8 +568,8 @@ function autohelp:print {
 #
 ###/doc
 function autohelp:paged {
-	: ${PAGER=less}
-	autohelp:print "$@" | $PAGER
+    : ${PAGER=less}
+    autohelp:print "$@" | $PAGER
 }
 
 ### autohelp:check Usage:bbuild
@@ -482,31 +578,31 @@ function autohelp:paged {
 #
 # Example use:
 #
-#	#!/bin/bash
+#    #!/bin/bash
 #
-#	### Some help Usage:help
-#	#
-#	# Some help text
-#	#
-#	###/doc
+#    ### Some help Usage:help
+#    #
+#    # Some help text
+#    #
+#    ###/doc
 #
-#	#%include autohelp.sh
+#    #%include autohelp.sh
 #
-#	main() {
-#		autohelp:check "$@"
+#    main() {
+#        autohelp:check "$@"
 #
-#		# now add your code
-#	}
+#        # now add your code
+#    }
 #
-#	main "$@"
+#    main "$@"
 #
 ###/doc
 autohelp:check() {
-	if [[ "$*" =~ --help ]]; then
-		cols="$(tput cols)"
-		autohelp:print | fold -w "$cols" -s || autohelp:print
-		exit 0
-	fi
+    if [[ "$*" =~ --help ]]; then
+        cols="$(tput cols)"
+        autohelp:print | fold -w "$cols" -s || autohelp:print
+        exit 0
+    fi
 }
 
 set -euo pipefail
