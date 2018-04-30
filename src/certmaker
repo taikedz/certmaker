@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+### certmaker Usage:help
+#
+# Tool to generate a CA, generate keys and CSRs, and sign CSRs
+#
+# Create a new CA:
+#
+# 	certmaker new ca CONFFILE
+#
+# Create a new host profile:
+#
+# 	certmaker new host HOST
+#
+# Sign a named host:
+#
+# 	certmaker sign HOST
+#
+# Sign a CSR:
+#
+# 	certmaker sign CSRFILE
+#
+###/doc
+
+#%include autohelp.sh out.sh
+#%include ctconf.sh
+
+cm:main() {
+	action="$1"; shift || :
+	# Do not autohelp:check here, as it would override sub-topic help
+
+	case "$action" in
+		new)
+			cm:new "$@"
+			;;
+		sign)
+			cm:csr:sign "$@"
+			;;
+
+		help)
+			autohelp:print
+			exit 0
+			;;
+		*)
+			autohelp:print
+			out:fail "Unknown action $action"
+			;;
+	esac
+}
+
+cm:helpcheck() {
+	local section="$1"; shift
+
+	[[ "$*" =~ --help ]] || return 0
+
+	autohelp:print new-ca
+
+	exit 0
+}
+
+cm:main "$@"
