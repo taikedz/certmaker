@@ -2,7 +2,7 @@
 
 CERTMAKER_confpaths=".:$HOME/.config/certmaker:/etc/certmaker"
 
-ctconf:load_config() {
+cm:config:load_config() {
 	local conffile="$(searchpaths:file_from "$CERTMAKER_confpaths" certmaker.config)"
 
 	if [[ -z "$conffile" ]]; then
@@ -10,11 +10,8 @@ ctconf:load_config() {
 	fi
 
 	. "$conffile"
-
-	ctconf:verify
 }
 
-ctconf:verify() {
-	# Most basic required configurations
-	vars:require castore certhosts
+cm:config:get_temp() {
+    echo "$cnftemplates/$1.cnf"
 }

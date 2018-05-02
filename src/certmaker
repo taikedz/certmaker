@@ -6,62 +6,64 @@
 #
 # Create a new CA:
 #
-# 	certmaker new ca CONFFILE
+#     certmaker new ca CONFFILE
 #
 # Create a new host profile:
 #
-# 	certmaker new host HOST
+#     certmaker new host HOST
 #
 # Sign a named host:
 #
-# 	certmaker sign HOST
+#     certmaker sign HOST
 #
 # Sign a CSR:
 #
-# 	certmaker sign CSRFILE
+#     certmaker sign CSRFILE
 #
 ###/doc
 
-#%include autohelp.sh out.sh
-#%include ctconf.sh
+#%include safe.sh autohelp.sh out.sh
+#%include ctconf.sh template.sh
 
 cm:main() {
-	action="$1"; shift || :
-	# Do not autohelp:check here, as it would override sub-topic help
+    action="$1"; shift || :
+    # Do not autohelp:check here, as it would override sub-topic help
 
-	case "$action" in
+    cm:config:load_config
+
+    case "$action" in
         template)
             cm:template "$@"
             ;;
-		new)
-			cm:new "$@"
-			;;
-		sign)
-			cm:csr:sign "$@"
-			;;
+        new)
+            cm:new "$@"
+            ;;
+        sign)
+            cm:csr:sign "$@"
+            ;;
 
-		help)
-			autohelp:print
-			exit 0
-			;;
+        help)
+            autohelp:print
+            exit 0
+            ;;
         view)
             cm:view "$@"
             ;;
-		*)
-			autohelp:print
-			out:fail "Unknown action $action"
-			;;
-	esac
+        *)
+            autohelp:print
+            out:fail "Unknown action $action"
+            ;;
+    esac
 }
 
 cm:helpcheck() {
-	local section="$1"; shift
+    local section="$1"; shift
 
-	[[ "$*" =~ --help ]] || return 0
+    [[ "$*" =~ --help ]] || return 0
 
-	autohelp:print new-ca
+    autohelp:print new-ca
 
-	exit 0
+    exit 0
 }
 
 cm:main "$@"

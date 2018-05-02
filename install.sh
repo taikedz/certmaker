@@ -41,6 +41,7 @@ if [[ ! -f "$CONFIGD/certmaker.config" ]]; then
     sed "
     s=%CASTORE%=$DATAD/ca=
     s=%HOSTSTORE%=$DATAD/hosts=
+    s=%DEFAULTCNF%=$DATAD/default-cnf=
     " cm-config/default-certmaker.config > "$CONFIGD/certmaker.config"
 else
 	exists "$CONFIGD/certmaker.config"
