@@ -12,12 +12,12 @@ prompt             = no
 
 ####################################################################
 [ server_distinguished_name ]
-countryName          = 2 Letter Cuontry Code
+countryName          = 2 Letter Country Code
 stateOrProvinceName  = Region
 localityName         = Town or City
 organizationName     = Company
 commonName           = Department
-emailAddress         = Eamil@Address
+emailAddress         = Email@Address
 
 ####################################################################
 [ server_req_extensions ]
@@ -29,7 +29,9 @@ subjectAltName       = @alternate_names
 nsComment            = "OpenSSL Generated Certificate"
 
 ####################################################################
+# Change these to match the DNS names you want the certificate to apply to
 [ alternate_names ]
 
-DNS.1  = %HOSTNAME%
-DNS.2  = %FQDN%
+DNS.1  =
+DNS.2  =
+# ...

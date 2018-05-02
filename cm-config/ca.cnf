@@ -18,9 +18,9 @@ x509_extensions = ca_extensions # The extensions to add to the cert
 email_in_dn     = no            # Don't concat the email in the DN
 copy_extensions = copy          # Required to copy SANs from CSR to cert
 
-base_dir      = ./%CANAME%-store
-certificate   = $base_dir/%CANAME%-ca.cer # The CA certifcate
-private_key   = $base_dir/%CANAME%.key    # The CA private key
+base_dir      = %CASTOREDIR%
+certificate   = $base_dir/authority.cer   # The CA certifcate
+private_key   = $base_dir/authority.key   # The CA private key
 new_certs_dir = $base_dir                 # Location for new certs after signing
 database      = $base_dir/index.txt       # Database index file
 serial        = $base_dir/serial.txt      # The current serial number
@@ -37,6 +37,7 @@ x509_extensions    = ca_extensions
 string_mask        = utf8only
 
 ####################################################################
+# UPDATE these with the appropriate values
 [ ca_distinguished_name ]
 countryName              = 2 Letter Country Code
 stateOrProvinceName      = Region or State

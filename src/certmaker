@@ -30,6 +30,9 @@ cm:main() {
 	# Do not autohelp:check here, as it would override sub-topic help
 
 	case "$action" in
+        template)
+            cm:template "$@"
+            ;;
 		new)
 			cm:new "$@"
 			;;
@@ -41,6 +44,9 @@ cm:main() {
 			autohelp:print
 			exit 0
 			;;
+        view)
+            cm:view "$@"
+            ;;
 		*)
 			autohelp:print
 			out:fail "Unknown action $action"

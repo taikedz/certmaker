@@ -10,28 +10,21 @@ It can optionally be used by site owners to generate their own keys and CSRs, to
 
 	sudo ./install.sh
 
-Initialize the config - the recommended path is `/etc/certmaker`, but you can also create a config in the local directory instead. `certmaker` looks for a `certmaker.config` file in turn in `./`, `~/.config/certmaker`, and `/etc/certmaker/`. Only the first one found is loaded.
+Configuration is palced in `/etc/certmaker/certmaker.config`
 
-	echo "castore=/var/certmaker/ca" > /etc/certmaker/certmaker.config
-	echo "hoststore=/var/certmaker/hosts" >> /etc/certmaker/certmaker.config
-	echo "keysize=4096" >> /etc/certmaker/certmaker.config
-	echo "hashalgorithm=sha256" >> /etc/certmaker/certmaker.config
+If you do not install as root, it is placed in `~/.config/certmaker/certmaker.config`
 
 ## Quick start
 
-This section assumes tha the CA takes responsibility for creating and distributing key/certificate pairs.
+This section assumes that the CA takes responsibility for creating and distributing key/certificate pairs.
 
 ### New CA
 
 Initialize a new CA store
 
-	certmaker temp ca
+	certmaker template ca authority.cnf
 
 	certmaker new ca authority.cnf
-
-When the CA certificate needs to be re-created, you can simply archive the existing CA, and create a new one
-
-	certmaker renew ca
 
 ### New hosts
 
@@ -64,15 +57,15 @@ To renew a certificate, just sign the existing host definition, and copy the new
 
 On the target host to receive a certificate, create a CSR
 
-	certmaker temp host myhost.cnf
+	certmaker template host myhost.cnf
 
 	# Edit the ./myhost.cnf file that is created
 	
-	certmaker regen-csr ./myhost.cnf
+	certmaker renew csr ./myhost.cnf
 
 This will create a CSR file `myhost.csr` to send to the CA
 
-### Ceritifate Authority
+### Certificate Authority
 
 Follow the steps above for creating a CA
 

@@ -1,2 +1,2 @@
 BUILDOUTD=./bin/
-BBFILES=(src/cert-getter.sh src/certtool)
+BBFILES=(src/certmaker)
