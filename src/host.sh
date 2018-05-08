@@ -1,4 +1,4 @@
-### New registered host Usage:new
+### New registered host Usage:new-host
 #
 # Create a new stored host for certfiying
 #
@@ -9,9 +9,23 @@
 ###/doc
 
 cm:host:new-host() {
-	# Make a host directory in the geenral hosts directory
-	# Get config template and put it in the target host directory
-	# Generate a 
+	cm:helpcheck new-host "$@"
+
+	if [[ -z "$*" ]]; then
+		out:fail "You need to specify a name for the host configuration. Try adding '--help'"
+	fi
+
+	local myhost myhostd
+	myhost="$1"; shift
+	myhostd="$hoststore/$myhost"
+
+	[[ "$myhost" =~ ^[a-zA-Z0-9_.-]+$ ]] || out:fail "Host name can only contain letters, numbers, underscore, period and dash."
+
+	[[ ! -d "$myhostd" ]] || out:fail "Host '$myhost' already exists."
+
+	mkdir -p "$myhostd"
+
+	cm:template host "$myhostd/openssl.cnf"
 }
 
 ### Edit host config Usage:edit
@@ -23,4 +37,19 @@ cm:host:new-host() {
 ###/doc
 
 cm:host:edit-host() {
+	cm:helpcheck edit "$@"
+
+	if [[ -z "$*" ]]; then
+		out:fail "You need to specify a name for the host configuration. Try adding '--help'"
+	fi
+
+	local myhost myhostd
+	myhost="$1"; shift
+	myhostd="$hoststore/$myhost"
+
+	[[ -d "$myhostd" ]] || out:fail "Host '$myhost' does not exist."
+
+	EDITOR="${EDITOR:-nano}"
+
+	exec "$EDITOR" "$myhostd/openssl.cnf"
 }

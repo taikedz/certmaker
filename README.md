@@ -32,6 +32,11 @@ Create a new host
 
 	certmaker new host myhost
 
+Change host config, and regenerate CSR
+
+	certmaker edit myhost
+	certmaker renew csr myhost
+
 Sign the host's CSR
 
 	certmaker sign host myhost
@@ -42,14 +47,9 @@ List the key and certificate paths, copy the files to your target host
 
 ## Extra steps
 
-Change host config, and regenerate CSR
-
-	certmaker edit myhost
-	certmaker renew csr myhost
-
 To renew a certificate, just sign the existing host definition, and copy the new certificate to the target host machine.
 
-	certmaker sign myhost
+	certmaker sign host myhost
 
 ## Generic CSR and CA activities
 

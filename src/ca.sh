@@ -1,10 +1,10 @@
 #%include vars.sh
 
-### New Certificate Authority Usage:new
+### New Certificate Authority Usage:new-ca
 #
 # Create and manage a certificate authority
 #
-# 	certmaker new-ca SSLCONF
+# 	certmaker new ca SSLCONF
 #
 # Create your SSL config file, and pass it in as SSLCONF
 #

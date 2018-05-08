@@ -38,10 +38,12 @@ cm:main() {
         new)
             cm:new "$@"
             ;;
+        edit)
+            cm:host:edit-host "$@"
+            ;;
         sign)
             cm:csr:sign "$@"
             ;;
-
         help)
             autohelp:print
             exit 0
@@ -61,7 +63,7 @@ cm:helpcheck() {
 
     [[ "$*" =~ --help ]] || return 0
 
-    autohelp:print new-ca
+    autohelp:print "$section"
 
     exit 0
 }
