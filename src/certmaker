@@ -56,13 +56,17 @@
 #
 #     certmaker new ca CONFFILE
 #
+# ### Certificate viewing and fetching
+#
+# Fetch a site's certificate, and view a certificate file
+#
 #
 ###/doc
 
 #%include safe.sh autohelp.sh out.sh
 #%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh
 
-#%include guide.sh
+#%include guide.sh cert-getter.sh
 
 cm:main() {
     # Do not autohelp:check here, as it would override sub-topic help
@@ -71,6 +75,17 @@ cm:main() {
         exit 0
     }
     action="$1"; shift || :
+
+    case "$action" in
+        view|fetch)
+            cert-getter:main "$action" "$@"
+            return
+            ;;
+        help|--help)
+            cm:guide
+            return 0
+            ;;
+    esac
 
     cm:config:load_config
 
@@ -89,10 +104,6 @@ cm:main() {
             ;;
         renew)
             cm:renew "$@"
-            ;;
-        help)
-            cm:guide
-            exit 0
             ;;
         paths)
             cm:paths "$@"
