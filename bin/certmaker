@@ -22,7 +22,7 @@
 #
 ###/doc
 
-##bash-libs: safe.sh @ 75ff4139 (1.1)
+##bash-libs: safe.sh @ 75ff4139-modified (1.1)
 
 ### Safe mode Usage:bbuild
 #
@@ -36,7 +36,7 @@
 ###/doc
 
 set -eufo pipefail
-##bash-libs: autohelp.sh @ 75ff4139 (1.1)
+##bash-libs: autohelp.sh @ 75ff4139-modified (1.1)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -147,9 +147,9 @@ autohelp:check() {
         exit 0
     fi
 }
-##bash-libs: out.sh @ 75ff4139 (1.1)
+##bash-libs: out.sh @ 75ff4139-modified (1.1)
 
-##bash-libs: colours.sh @ 75ff4139 (1.1)
+##bash-libs: colours.sh @ 75ff4139-modified (1.1)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
@@ -179,7 +179,7 @@ autohelp:check() {
 #
 ###/doc
 
-##bash-libs: tty.sh @ 75ff4139 (1.1)
+##bash-libs: tty.sh @ 75ff4139-modified (1.1)
 
 tty:is_ssh() {
     [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
@@ -443,7 +443,7 @@ function out:break {
 if [[ "$MODE_DEBUG_VERBOSE" = true ]]; then
     set -x
 fi
-##bash-libs: searchpaths.sh @ 75ff4139 (1.1)
+##bash-libs: searchpaths.sh @ 75ff4139-modified (1.1)
 
 
 # FIXME - set function signature in head of help
@@ -484,7 +484,7 @@ function searchpaths:file_from {
     done
     return 1
 }
-##bash-libs: vars.sh @ 75ff4139 (1.1)
+##bash-libs: vars.sh @ 75ff4139-modified (1.1)
 
 ### Vars library Usage:bbuild
 #
@@ -564,9 +564,423 @@ cm:template() {
     esac
 }
 
+::() {
+    [[ -n "$*" ]] || out:fail "No command specified"
+
+	echo  "${CBTEA}$*${CDEF}"
+
+	if [[ "${DRYRUN:-}" != true ]]; then
+		"$@"
+	fi
+}
+
+### New Certificate Authority Usage:new-ca
+#
+# Create and manage a certificate authority
+#
+# 	certmaker new ca SSLCONF
+#
+# Create your SSL config file, and pass it in as SSLCONF
+#
+# Ensure you have a `keysize` and `hashalgorithm` entry in your certmaker config
+#
+# If in doubt, use
+#
+# 	keysize=4096
+# 	hashalgorithm=sha256
+#
+###/doc
+
+cm:ca:new-ca() {
+	cm:helpcheck new-ca "$@"
+	local sslconf
+	sslconf="${1:-}" ; shift || :
+
+    [[ -n "${sslconf:-}" ]] || out:fail "Provide the SSL config file"
+
+	[[ ! -e "$castore" ]] || out:fail "'$castore' must not exist. Archive the existing directory, and try again."
+
+	mkdir -p "$castore"
+	chmod 700 "$castore"
+
+	cp "$sslconf" "$castore/authority.cnf"
+
+	:: openssl req -x509 -config "$castore/authority.cnf" -out "$castore/authority.cer" -outform PEM -keyout "$castore/authority.key" -newkey rsa:"$keysize" -"$hashalgorithm"
+
+	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
+}
+##bash-libs: askuser.sh @ 75ff4139-modified (1.1)
+
+### askuser Usage:bbuild
+# Present the user with questions on stderr
+###/doc
+
+
+yespat='^(yes|YES|y|Y)$'
+numpat='^[0-9]+$'
+rangepat='[0-9]+,[0-9]+'
+listpat='^[0-9 ]+$'
+blankpat='^ *$'
+
+### askuser:confirm Usage:bbuild
+# Ask the user to confirm a closed question. Defaults to no
+#
+# returns 0 on successfully match 'y' or 'yes'
+# returns 1 otherwise
+###/doc
+function askuser:confirm {
+    read -p "$* [y/N] > " 1>&2
+    if [[ "$REPLY" =~ $yespat ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+### askuser:ask Usage:bbuild
+# Ask the user to provide some text
+#
+# Echoes out the entered text
+###/doc
+function askuser:ask {
+    read -p "$* : " 1>&2
+    echo "$REPLY"
+}
+
+### askuser:password Usage:bbuild
+# Ask the user to enter a password (does not echo what is typed)
+#
+# Echoes out the entered text
+###/doc
+function askuser:password {
+    read -s -p "$* : " 1>&2
+    echo "$REPLY"
+}
+
+### askuser:choose_multi Usage:bbuild
+# Allows the user to choose from multiple choices
+#
+# askuser:chose_multi MESG CHOICESTRING
+#
+#
+# MESG is a single string token that will be displayed as prompt
+#
+# CHOICESTRING is a comma-separated, or newline separated, or "\\n"-separated token string
+#
+# Equivalent strings include:
+#
+# * `"a\\nb\\nc"` - quoted and explicit newline escapes
+# * `"a,b,c"` - quoted and separated with commas
+# * `a , b , c` - not quoted, separated by commas
+# * `a`, `b` and `c` on their own lines
+#
+# User input:
+#
+# User can choose by selecting
+#
+# * a single item by number
+# * a range of numbers (4,7 for range 4 to 7)
+# * or a string that matches the pattern
+#
+# All option lines that match will be returned, one per line
+#
+# If the user selects nothing, then function returns 1 and an empty stdout
+###/doc
+function askuser:choose_multi {
+    local mesg=$1; shift || :
+    local choices=$(echo "$*"|sed -r 's/ *, */\n/g')
+    out:debug "CHOICES: $choices"
+
+    out:info "$mesg:" 
+    local choicelist="$(echo -e "$choices"|egrep '^' -n| sed 's/:/: /')"
+    echo "$choicelist" 1>&2
+    
+    local sel=$(askuser:ask "Choice")
+    if [[ "$sel" =~ $blankpat ]]; then
+        return 1
+
+    elif [[ "$sel" =~ $numpat ]] || [[ "$sel" =~ $rangepat ]]; then
+        out:debug "Number choice [$sel]"
+        echo -e "$choices" | sed -n "$sel p"
+    
+    elif [[ "$sel" =~ $listpat ]]; then
+        echo "$choicelist" | egrep "^${sel// /|}:" | sed -r 's/^[0-9]+: //'
+
+    else
+        out:debug "Pattern choice [$sel]"
+        echo -e "$choices"  |egrep "$(echo "$sel"|tr " " '|')"
+    fi
+    return 0
+}
+
+### askuser:choose Usage:bbuild
+# Ask the user to choose an item
+#
+# Like askuser:choose_multi, but will loop if the user selects more than one item
+#
+# If the user provides no entry, returns 1
+#
+# If the user chooses one item, that item is echoed to stdout
+###/doc
+function askuser:choose {
+    local mesg=$1; shift || :
+    while true; do
+        local thechoice="$(askuser:choose_multi "$mesg" "$*")"
+        local lines=$(echo -n "$thechoice" | grep '$' -c)
+        if [[ $lines = 1 ]]; then
+            echo "$thechoice"
+            return 0
+        elif [[ $lines = 0 ]]; then
+            return 1
+        else
+            out:warn "Too many results"
+        fi
+    done
+}
+
+### CSR Signing Usage:sign
+#
+# Sign a known host or csr
+#
+# 	certmaker sign host HOSTNAME
+#
+# 	certmaker sign csr CSRFILE
+#
+###/doc
+
+cm:sign() {
+	cm:helpcheck sign "$@"
+	
+	local target="${1:-}"; shift || out:fail "Specify target to sign"
+
+    if [[ -f "$target" ]]; then
+		cm:sign:csr "$target" "$@"
+    else
+		cm:sign:host "$target" "$@"
+    fi
+}
+
+cm:sign:csr() {
+	local csrfile certfile opssl_opts passfile passin
+	csrfile="$1"; shift
+	certfile="${csrfile%.*}.cer"
+
+	cm:sign:overwrite_check "$certfile"
+
+	files:ensure_file "$castore/index.txt"
+	files:ensure_file "$castore/serial.txt" '01'
+
+    passfile="$castore/pass.txt"
+
+    opssl_opts=( -config "$castore/authority.cnf" -policy signing_policy -extensions signing_req -out "$certfile" -infiles "$csrfile")
+
+	# Switch to batch mode when password file exists
+    if [[ -f "$passfile" ]]; then
+        :: openssl ca -batch -passin "file:$passfile" "${opssl_opts[@]}"
+    else
+        :: openssl ca "${opssl_opts[@]}"
+    fi
+}
+
+cm:sign:host() {
+    local host_name hostd
+    host_name="$1"; shift
+    hostd="$hoststore/$host_name"
+
+    [[ -d "$hostd" ]] || out:fail "No such host profile '$host_name'"
+
+    cm:sign:csr "$hostd/$host_name.csr" "$hostd/$host_name.cer"
+}
+
+cm:sign:overwrite_check() {
+	local certfile="$1"; shift
+	
+	[[ -f "$certfile" ]] || return 0
+
+	askuser:confirm "${CYEL}Overwrite '$certfile'?$CDEF" || out:fail "Abort."
+
+	rm "$certfile" || out:fail "Could not remove '$certfile'"
+}
+
+
+files:ensure_file() {
+	local target="$1"; shift
+	local tdir="$(dirname "$target")"
+
+	[[ -d "$tdir" ]] || mkdir -p "$tdir"
+
+	[[ -f "$target" ]] || echo -n "$*" > "$target"
+}
+### New registered host Usage:new-host
+#
+# Create a new stored host for certfiying
+#
+# Generates a key + CSR pair stored against the name
+#
+# 	certmaker new host HOST
+#
+###/doc
+
+cm:host:new-host() {
+	cm:helpcheck new-host "$@"
+
+	if [[ -z "$*" ]]; then
+		out:fail "You need to specify a name for the host configuration. Try adding '--help'"
+	fi
+
+	local myhost myhostd
+	myhost="$1"; shift
+	myhostd="$hoststore/$myhost"
+
+	[[ "$myhost" =~ ^[a-zA-Z0-9_.-]+$ ]] || out:fail "Host name can only contain letters, numbers, underscore, period and dash."
+
+	[[ ! -d "$myhostd" ]] || out:fail "Host '$myhost' already exists."
+
+	mkdir -p "$myhostd"
+
+	cm:template host "$myhostd/$myhost.cnf"
+}
+
+### Edit host config Usage:edit
+#
+#	certmaker edit HOST
+#
+# Edit the SSL config for the registered host
+#
+###/doc
+
+cm:host:edit-host() {
+	cm:helpcheck edit "$@"
+
+	if [[ -z "$*" ]]; then
+		out:fail "You need to specify a name for the host configuration. Try adding '--help'"
+	fi
+
+	local myhost myhostd
+	myhost="$1"; shift
+	myhostd="$hoststore/$myhost"
+
+	[[ -d "$myhostd" ]] || out:fail "Host '$myhost' does not exist."
+
+	EDITOR="${EDITOR:-nano}"
+
+	exec "$EDITOR" "$myhostd/$myhost.cnf"
+}
+### New entity Usage:new
+#
+# Create a new Certificate Authority, or Host
+#
+#   certmaker new host HOSTNAME
+#
+#   certmaker new ca CACONF
+#
+# You can generate a CACONF file with
+#
+#   certmaker template ca [CACONF]
+#
+###/doc
+
+cm:new() {
+    cm:helpcheck new "$@"
+
+	local target="$1"; shift
+
+	case "$target" in
+	ca)
+		cm:ca:new-ca "$@"
+		;;
+	host)
+		cm:host:new-host "$@"
+		;;
+	*)
+		out:fail "Unknown target for new: '$target'"
+		;;
+	esac
+}
+### CSR Regenration Usage:renew
+#
+# (Re-)generate key for the host or config.
+#
+#	certmaker renew key CONFIG [KEYFILE]
+#	certmaker renew key HOST
+#
+# (Re-)generate CSR for the host or key+config file pair
+#
+#	certmaker renew csr KEYFILE CONFIG [CSRFILE]
+#	certmaker renew csr HOST
+#
+###/doc
+
+cm:renew() {
+    cm:helpcheck renew "$@"
+
+    local rtype="${1:-}" ; shift || out:fail "Specify renewal type"
+    local filehost="${1:-}" ; shift || out:fail "Specify target file or host"
+
+    case "$rtype" in
+    csr|key)
+        if [[ -f "$filehost" ]]; then
+            cm:renew:${rtype}-file "$filehost" "$@"
+        else
+            cm:renew:${rtype}-host "$filehost" "$@"
+        fi
+        ;;
+    *)
+        out:fail "Unknown renewal type '$rtype'"
+        ;;
+    esac
+}
+
+cm:renew:key-file() {
+    local config keyfile
+
+    config="${1:-}"; shift  || out:fail "Specify an OpenSSL config file"
+    keyfile="${1:-}"; shift || {
+        keyfile="${config%.*}.key"
+    }
+
+    :: openssl genrsa -out "$keyfile" "$keysize" -config "$config"
+}
+
+cm:renew:key-host() {
+    local host_name hostd
+    host_name="${1:-}" ; shift || out:fail "Specify a host profile name"
+
+    hostd="$hoststore/$host_name"
+    [[ -d "$hostd" ]] || out:fail "No such host profile [$host_name]"
+
+    cm:renew:key-file "$hostd/${host_name}.cnf" "$hostd/${host_name}.key"
+}
+
+cm:renew:csr-file() {
+    local keyfile csrfile config
+    keyfile="${1:-}"; shift || out:fail "Specify an input key file"
+    config="${1:-}"; shift  || out:fail "Specify an OpenSSL config file"
+
+    csrfile="${1:-}"; shift || {
+        csrfile="${keyfile%.*}.csr"
+    }
+
+    :: openssl req -new -key "$keyfile" -out "$csrfile" -config "$config"
+}
+
+cm:renew:csr-host() {
+    local host_name hostd
+    host_name="${1:-}" ; shift || out:fail "Specify a host profile name"
+
+    hostd="$hoststore/$host_name"
+    [[ -d "$hostd" ]] || out:fail "No such host profile [$host_name]"
+
+    cm:renew:csr-file "$hostd/${host_name}.key" "$hostd/${host_name}.cnf" "$hostd/${host_name}.csr"
+}
+
 cm:main() {
-    action="$1"; shift || :
     # Do not autohelp:check here, as it would override sub-topic help
+    [[ -n "$*" ]] || {
+        autohelp:print
+        exit 0
+    }
+    action="$1"; shift || :
 
     cm:config:load_config
 
@@ -577,10 +991,15 @@ cm:main() {
         new)
             cm:new "$@"
             ;;
-        sign)
-            cm:csr:sign "$@"
+        edit)
+            cm:host:edit-host "$@"
             ;;
-
+        sign)
+            cm:sign "$@"
+            ;;
+        renew)
+            cm:renew "$@"
+            ;;
         help)
             autohelp:print
             exit 0
@@ -600,7 +1019,7 @@ cm:helpcheck() {
 
     [[ "$*" =~ --help ]] || return 0
 
-    autohelp:print new-ca
+    autohelp:print "$section"
 
     exit 0
 }

@@ -1,4 +1,4 @@
-#%include vars.sh
+#%include util.sh
 
 ### New Certificate Authority Usage:new-ca
 #
@@ -22,7 +22,7 @@ cm:ca:new-ca() {
 	local sslconf
 	sslconf="${1:-}" ; shift || :
 
-	vars:require keysize hashalgorithm sslconf
+    [[ -n "${sslconf:-}" ]] || out:fail "Provide the SSL config file"
 
 	[[ ! -e "$castore" ]] || out:fail "'$castore' must not exist. Archive the existing directory, and try again."
 

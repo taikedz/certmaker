@@ -25,7 +25,7 @@ cm:host:new-host() {
 
 	mkdir -p "$myhostd"
 
-	cm:template host "$myhostd/openssl.cnf"
+	cm:template host "$myhostd/$myhost.cnf"
 }
 
 ### Edit host config Usage:edit
@@ -51,5 +51,5 @@ cm:host:edit-host() {
 
 	EDITOR="${EDITOR:-nano}"
 
-	exec "$EDITOR" "$myhostd/openssl.cnf"
+	exec "$EDITOR" "$myhostd/$myhost.cnf"
 }

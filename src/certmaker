@@ -23,11 +23,15 @@
 ###/doc
 
 #%include safe.sh autohelp.sh out.sh
-#%include ctconf.sh template.sh
+#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh
 
 cm:main() {
-    action="$1"; shift || :
     # Do not autohelp:check here, as it would override sub-topic help
+    [[ -n "$*" ]] || {
+        autohelp:print
+        exit 0
+    }
+    action="$1"; shift || :
 
     cm:config:load_config
 
@@ -42,7 +46,10 @@ cm:main() {
             cm:host:edit-host "$@"
             ;;
         sign)
-            cm:csr:sign "$@"
+            cm:sign "$@"
+            ;;
+        renew)
+            cm:renew "$@"
             ;;
         help)
             autohelp:print

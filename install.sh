@@ -30,7 +30,7 @@ fi
 
 mkdir -p "$BINS"
 mkdir -p "$CONFIGD"
-mkdir -p "$DATAD"/{ca,hosts,default-cnf}
+mkdir -p "$DATAD"/{hosts,default-cnf}
 
 # ---------------------
 # Deploy
