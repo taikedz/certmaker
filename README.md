@@ -1,88 +1,103 @@
-# CertMaker
+CertMaker
+===========
 
 A tool to create an OpenSSL certificate authority, and generate certificates, for use on internal networks.
 
-This tool is intended as a security admin tool for internal websites, and assumes by default that the entity creating the CA and managing the certs can deploy them, in which case it should NOT be used for public websites.
+The tool is written with two uses cases in mind:
 
-It can optionally be used by site owners to generate their own keys and CSRs, to send along, and for CAs to sign ad-hoc CSRs. You can use this tool for generating your CSRs for sending to trusted and/or commercial CAs.
+* As an *internal* CA tool that will act as CA and manage cert/key pairs centrally, distributing them to target servers
+    * the `quick` mode is an implementation of this workflow
+* As a *CSR client* tool for generating CSRs to be sent to CAs
+* As a plain internal CA that can sign individual CSRs
 
-## Install certmaker
+If you are deploying a public-facing web site, please consider using [Let's Encrypt](https://letsencrypt.org)
 
-	sudo ./install.sh
+
+
+Install certmaker
+-----------------
+
+    sudo ./install.sh
 
 Configuration is palced in `/etc/certmaker/certmaker.config`
 
 If you do not install as root, it is placed in `~/.config/certmaker/certmaker.config`
 
-## Quick start
+Ensure your `EDITOR` environment variable is set to your preferred text editor; if it is not set, CertMaker will try to use Emacs, nano, vim or vi.
 
-### New CA
 
-Get new CA config file. Edit the CNF file, specifically ensure you update the organisation country and details
 
-	certmaker template ca authority.cnf
+New CA
+---------
 
-Now initialize a new store with that config
+Sets up a new CA config, and opens an editor; specifically ensure you update the organisation country and details. You can also edit the `default_days` property to specify the number of days a newly signed cert is valid for. You will be prompted for a password for the key.
 
-	certmaker new ca authority.cnf
+    certmaker new ca
 
-    # You can delete the local cnf now
-    # rm authority.cnf
+Set up a generic hosts config which will be used as a template for managed hosts
 
-### Centrally managed hosts
+    certmaker quick --edit
+
+It is possible to save a password file in plaintext in `$CERTMAKERCONFIG/ca/pass.txt` to allow running in batch mode; treat this with caution.
+
+
+Centrally managed hosts
+-----------------------
 
 If you want the CA to manage both keys and certificates for host machines, use these steps. In this scenario, the CA is responsible for creating both the keys and the certificates that will be placed on host machines.
 
+Create a new host profile - you will be prompted to edit it, and will then be given paths to a key and cert file as a result.
 
-Create a new host profile ("host")
+    certmaker quick myhost
 
-	certmaker new host myhost
+Re-run the command any time you want to renew the certificate. You will need to copy the new certificate to the desired host machine to replace the old certificate.
 
-Change host config, then generate key and CSR files
 
-	certmaker edit myhost
-	certmaker renew key myhost
-	certmaker renew csr myhost
 
-Sign the host's CSR
+Generic CSR and CA activities
+-----------------------------
 
-	certmaker sign host myhost
 
-List the key and certificate paths, copy the files to your target host
-
-	certmaker paths myhost
-
-## Extra steps
-
-To renew a certificate, just sign the existing host definition.
-
-	certmaker sign host myhost
-
-You will need to copy the new certificate to the desired host machine to replace the old certificate.
-
-## Generic CSR and CA activities
-
-### Target host
+###    Target host
 
 If you simply want to create a CSR for your machine, to send to a remote CA for signing:
 
-On the target host to receive a certificate, create a CSR
+Create a configuration for the CSR, and edit it
 
-	certmaker template host myhost.cnf
+    certmaker template host myhost.cnf
+    nano myhost.cnf
 
-	# Edit the ./myhost.cnf file that is created
+If you don't already have a key, create one form the config
 
-    # If you don't already have a key
-    #certmaker renew key ./myhost.cnf
-	
-	certmaker renew csr ./key-file.key ./myhost.cnf
+    certmaker renew key ./myhost.cnf
+
+Finally, create the CSR
+
+    certmaker renew csr ./key-file.key ./myhost.cnf
+
 
 This will create a CSR file `myhost.csr` to send to the CA
 
-### Certificate Authority
+
+
+###    Certificate Authority
 
 On receipt of a CSR, simply use the `sign csr` command:
 
-	certmaker sign csr CSRFILE [CERTFILE]
+    certmaker sign csr CSRFILE [CERTFILE]
 
 This will generate a certificate file as specified, or with the same base name as the CSR, to send back to the requestor.
+
+
+
+
+View a certificate
+------------------
+
+You can inspect the contents of a certificate PEM file (typically a block of base-64 data bounded with `BEGIN` and `END` statements) using
+
+    certmaker view CERTFILE
+
+Certificates generated by CertMaker are always PEM files.
+
+

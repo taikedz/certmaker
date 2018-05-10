@@ -1,3 +1,5 @@
+#%include util.sh
+
 ### New registered host Usage:new-host
 #
 # Create a new stored host for certfiying
@@ -26,30 +28,4 @@ cm:host:new-host() {
 	mkdir -p "$myhostd"
 
 	cm:template host "$myhostd/$myhost.cnf"
-}
-
-### Edit host config Usage:edit
-#
-#	certmaker edit HOST
-#
-# Edit the SSL config for the registered host
-#
-###/doc
-
-cm:host:edit-host() {
-	cm:helpcheck edit "$@"
-
-	if [[ -z "$*" ]]; then
-		out:fail "You need to specify a name for the host configuration. Try adding '--help'"
-	fi
-
-	local myhost myhostd
-	myhost="$1"; shift
-	myhostd="$hoststore/$myhost"
-
-	[[ -d "$myhostd" ]] || out:fail "Host '$myhost' does not exist."
-
-	EDITOR="${EDITOR:-nano}"
-
-	exec "$EDITOR" "$myhostd/$myhost.cnf"
 }

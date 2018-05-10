@@ -6,67 +6,10 @@
 # It is provided to you under the terms of the GNU General Public License v3
 # https://www.gnu.org/licenses/gpl-3.0.html
 
-### certmaker Usage:help
-#
-# Tool to generate a CA, generate keys and CSRs, and sign CSRs
-#
-# From https://github.com/taikedz/CertMaker
-#
-# Run
-#
-#   certmaker help
-#
-# for a quick-start manual
-# 
-# ### Listing profiles
-#
-# List host profiles
-#
-#   certmaker paths
-#
-# List key and certificate for a host profile
-#
-#   certmaker paths HOST
-#
-#
-# ### Creating and signing profiles
-#
-# Create a new host profile, edit it:
-#
-#     certmaker new host HOST
-#     certmaker edit HOST
-#
-# Regenerate host profile assets
-#
-#   certmaker renew key { HOST | CONFIG [KEYFILE] }
-#   certmaker renew csr { HOST | KEYFILE CONFIG [CSRFILE] }
-#
-# Sign a host profile or CSR file:
-#
-#     certmaker sign { HOST | CSRFILE [CERTFILE] }
-#
-#
-# ### Generate new CA or templates
-#
-# Generate a new template configuration file
-#
-#   certmaker template { ca | host } [CONFFILE]
-#
-# Create a new CA:
-#
-#     certmaker new ca CONFFILE
-#
-# ### Certificate viewing and fetching
-#
-# Fetch a site's certificate, and view a certificate file
-#
-#
-###/doc
+#%include help.sh guide.sh cert-getter.sh
 
 #%include safe.sh autohelp.sh out.sh
-#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh
-
-#%include guide.sh cert-getter.sh
+#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh quick.sh edit.sh
 
 cm:main() {
     # Do not autohelp:check here, as it would override sub-topic help
@@ -89,6 +32,8 @@ cm:main() {
 
     cm:config:load_config
 
+    cm:checkuser
+
     case "$action" in
         template)
             cm:template "$@"
@@ -97,7 +42,7 @@ cm:main() {
             cm:new "$@"
             ;;
         edit)
-            cm:host:edit-host "$@"
+            cm:edit "$@"
             ;;
         sign)
             cm:sign "$@"
@@ -108,6 +53,9 @@ cm:main() {
         paths)
             cm:paths "$@"
             ;;
+        quick)
+            cm:quick "$@"
+            ;;
         *)
             autohelp:print
             out:fail "Unknown action $action"
@@ -115,14 +63,25 @@ cm:main() {
     esac
 }
 
+cm:checkuser() {
+    local iam=$(whoami)
+
+    [[ "$cmuser" = "$iam" ]] || {
+        out:warn "Loaded Certmaker config was installed for '$cmuser'."
+        askuser:confirm "Continue?"
+    }
+}
+
 cm:helpcheck() {
+
     local section="$1"; shift
 
-    [[ "$*" =~ --help ]] || return 0
+    if [[ "$*" =~ --help ]] || [[ -z "$*" ]]; then
+        autohelp:print "$section"
+        exit 0
+    fi
 
-    autohelp:print "$section"
-
-    exit 0
+    return 0
 }
 
 cm:main "$@"

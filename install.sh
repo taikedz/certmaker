@@ -42,6 +42,7 @@ if [[ ! -f "$CONFIGD/certmaker.config" ]]; then
     s=%CASTORE%=$DATAD/ca=
     s=%HOSTSTORE%=$DATAD/hosts=
     s=%DEFAULTCNF%=$DATAD/default-cnf=
+    s=%USER%=$(whoami)=
     " cm-config/default-certmaker.config > "$CONFIGD/certmaker.config"
 else
 	exists "$CONFIGD/certmaker.config"

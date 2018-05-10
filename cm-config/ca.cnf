@@ -3,6 +3,20 @@ RANDFILE        = $ENV::HOME/.rnd
 prompt          = no
 
 ####################################################################
+# UPDATE these with the appropriate values
+[ ca_distinguished_name ]
+countryName              = 2 Letter Country Code    # 'GB', 'US', 'DE', etc
+stateOrProvinceName      = Region or State
+localityName             = Town or City
+organizationName         = Company
+organizationalUnitName   = Department
+commonName               = Name
+emailAddress             = Email@Address
+
+# ------------------------------------------------------------------
+# Consider editing `default_days` in the `CA_default` section
+
+####################################################################
 [ ca ]
 default_ca    = CA_default      # The default ca section
 
@@ -31,21 +45,9 @@ unique_subject = no  # Set to 'no' to allow creation of
 ####################################################################
 [ req ]
 default_bits       = 4096
-#default_keyfile    = cakey.pem
 distinguished_name = ca_distinguished_name
 x509_extensions    = ca_extensions
 string_mask        = utf8only
-
-####################################################################
-# UPDATE these with the appropriate values
-[ ca_distinguished_name ]
-countryName              = 2 Letter Country Code
-stateOrProvinceName      = Region or State
-localityName             = Town or City
-organizationName         = Company
-organizationalUnitName   = Department
-commonName               = Name
-emailAddress             = Email@Address
 
 ####################################################################
 [ ca_extensions ]

@@ -4,9 +4,7 @@
 #
 # Create and manage a certificate authority
 #
-# 	certmaker new ca SSLCONF
-#
-# Create your SSL config file, and pass it in as SSLCONF
+# 	certmaker new ca
 #
 # Ensure you have a `keysize` and `hashalgorithm` entry in your certmaker config
 #
@@ -18,18 +16,16 @@
 ###/doc
 
 cm:ca:new-ca() {
-	cm:helpcheck new-ca "$@"
-	local sslconf
-	sslconf="${1:-}" ; shift || :
-
-    [[ -n "${sslconf:-}" ]] || out:fail "Provide the SSL config file"
+	cm:helpcheck new-ca "$@" .
 
 	[[ ! -e "$castore" ]] || out:fail "'$castore' must not exist. Archive the existing directory, and try again."
 
 	mkdir -p "$castore"
 	chmod 700 "$castore"
 
-	cp "$sslconf" "$castore/authority.cnf"
+	cm:template ca "$castore/authority.cnf"
+
+    cm:util:edit "$castore/authority.cnf"
 
 	:: openssl req -x509 -config "$castore/authority.cnf" -out "$castore/authority.cer" -outform PEM -keyout "$castore/authority.key" -newkey rsa:"$keysize" -"$hashalgorithm"
 

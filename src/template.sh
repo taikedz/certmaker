@@ -14,7 +14,6 @@ cm:template() {
         sed "
         s|%CASTOREDIR%|$castore|
         " "$fromfile" > "$outfile"
-        echo "New template in $outfile"
         ;;
     *)
         out:fail "No template for $target"
