@@ -27,7 +27,13 @@ function argcheck {
 
 function view_cert {
     [[ -f "$1" ]] || out:fail "No such file [$1]"
-    openssl x509 -text -noout -in "$1"
+
+    if grep -q "BEGIN CERTIFICATE REQUEST" "$1"; then
+        openssl req -text -noout -verify -in "$1"
+
+    else
+        openssl x509 -text -noout -in "$1"
+    fi
 }
 
 function fetch_cert {
