@@ -2,6 +2,16 @@ HOME            = .
 RANDFILE        = $ENV::HOME/.rnd
 
 ####################################################################
+# Update the details here !
+[ server_distinguished_name ]
+countryName          = 2 Letter Country Code
+stateOrProvinceName  = Region
+localityName         = Town or City
+organizationName     = Company
+commonName           = Department
+emailAddress         = Email@Address
+
+####################################################################
 [ req ]
 default_bits       = 4096
 #default_keyfile    = serverkey.pem
@@ -9,15 +19,6 @@ distinguished_name = server_distinguished_name
 req_extensions     = server_req_extensions
 string_mask        = utf8only
 prompt             = no
-
-####################################################################
-[ server_distinguished_name ]
-countryName          = 2 Letter Cuontry Code
-stateOrProvinceName  = Region
-localityName         = Town or City
-organizationName     = Company
-commonName           = Department
-emailAddress         = Eamil@Address
 
 ####################################################################
 [ server_req_extensions ]
@@ -29,7 +30,10 @@ subjectAltName       = @alternate_names
 nsComment            = "OpenSSL Generated Certificate"
 
 ####################################################################
+# Change these to match the DNS names you want the certificate to apply to
+# Ensure this is always the last section in this file
 [ alternate_names ]
 
-DNS.1  = %HOSTNAME%
-DNS.2  = %FQDN%
+#DNS.1  =
+#DNS.2  =
+# ...

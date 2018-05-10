@@ -1,9 +1,9 @@
-#!/bin/bash
-
-### Certificate Getter Usage:help
+### Certificate Getter Usage:cert-getter
 #
-#     cert-getter.sh fetch [SCHEME://]DOMAIN[:PORT]
-#     cert-getter.sh view CERTFILE
+# Certificate fetch and view agent.
+#
+#     certmaker fetch [SCHEME://]DOMAIN[:PORT]
+#     certmaker view CERTFILE
 #
 # Fetch the certificate for a HTTPS domain to a file, or view the contents of a certificate file
 #
@@ -11,7 +11,7 @@
 #
 # You can specify an alternative port, for example
 #
-#     cert-getter.sh fetch mydomain.net:8443
+#     certmaker fetch mydomain.net:8443
 #
 ###/doc
 
@@ -84,8 +84,8 @@ function get_domain_and_scheme {
     fi
 }
 
-main() {
-    autohelp:check "$@"
+cert-getter:main() {
+    cm:helpcheck cert-getter "$@"
 
     local action="$1"; shift
     local target="$1"; shift
@@ -108,5 +108,3 @@ main() {
         ;;
     esac
 }
-
-main "$@"

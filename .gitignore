@@ -1,5 +1,2 @@
 *.swp
-openssl.cnf
 scratch/
-test_*/
-*/demo-outputs

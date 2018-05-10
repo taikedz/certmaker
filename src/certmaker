@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+# This software is Free Software
+# (C) Tai Kedzierski 2017-2018
+#
+# It is provided to you under the terms of the GNU General Public License v3
+# https://www.gnu.org/licenses/gpl-3.0.html
+
+#%include help.sh guide.sh cert-getter.sh
+
+#%include safe.sh autohelp.sh out.sh
+#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh quick.sh edit.sh
+
+cm:main() {
+    # Do not autohelp:check here, as it would override sub-topic help
+    [[ -n "$*" ]] || {
+        autohelp:print
+        exit 0
+    }
+    action="$1"; shift || :
+
+    case "$action" in
+        view|fetch)
+            cert-getter:main "$action" "$@"
+            return
+            ;;
+        help|--help)
+            cm:guide
+            return 0
+            ;;
+    esac
+
+    cm:config:load_config
+
+    cm:checkuser
+
+    case "$action" in
+        template)
+            cm:template "$@"
+            ;;
+        new)
+            cm:new "$@"
+            ;;
+        edit)
+            cm:edit "$@"
+            ;;
+        sign)
+            cm:sign "$@"
+            ;;
+        renew)
+            cm:renew "$@"
+            ;;
+        paths)
+            cm:paths "$@"
+            ;;
+        quick)
+            cm:quick "$@"
+            ;;
+        *)
+            autohelp:print
+            out:fail "Unknown action $action"
+            ;;
+    esac
+}
+
+cm:checkuser() {
+    local iam=$(whoami)
+
+    [[ "$cmuser" = "$iam" ]] || {
+        out:warn "Loaded Certmaker config was installed for '$cmuser'."
+        askuser:confirm "Continue?"
+    }
+}
+
+cm:helpcheck() {
+
+    local section="$1"; shift
+
+    if [[ "$*" =~ --help ]] || [[ -z "$*" ]]; then
+        autohelp:print "$section"
+        exit 0
+    fi
+
+    return 0
+}
+
+cm:main "$@"
