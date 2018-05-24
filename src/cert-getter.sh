@@ -28,7 +28,7 @@ function argcheck {
 function view_cert {
     [[ -f "$1" ]] || out:fail "No such file [$1]"
 
-    if grep -q "BEGIN CERTIFICATE REQUEST" "$1"; then
+    if grep -qP "BEGIN( NEW)? CERTIFICATE REQUEST" "$1"; then
         openssl req -text -noout -verify -in "$1"
 
     else
