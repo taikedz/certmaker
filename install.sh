@@ -15,6 +15,13 @@ maycp() {
     cp "$1" "$2"
 }
 
+#Pre-check
+
+if [[ "$UID" != 0 ]] && [[ -f "/etc/certmaker/certmaker.config" ]] ; then
+    echo "Certmaker is already installed on this machine for root. User certmaker cannot co-exist with root certmaker."
+    exit 1
+fi
+
 # ---------------------
 # Create main dirs
 

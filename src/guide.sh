@@ -1,5 +1,5 @@
 cm:guide() {
-cat <<'EOHELP' | less
+cat <<'ENDOFEXTENDEDGUIDE' | less
 #%include ../README.md
-EOHELP
+ENDOFEXTENDEDGUIDE
 }

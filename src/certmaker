@@ -10,6 +10,7 @@
 
 #%include safe.sh autohelp.sh out.sh
 #%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh quick.sh edit.sh
+#%include jks-manip.sh
 
 cm:main() {
     # Do not autohelp:check here, as it would override sub-topic help
@@ -19,9 +20,14 @@ cm:main() {
     }
     action="$1"; shift || :
 
+    # Config-less modules
     case "$action" in
         view|fetch)
             cert-getter:main "$action" "$@"
+            return
+            ;;
+        jks)
+            jksm:main "$@"
             return
             ;;
         help|--help)
@@ -31,7 +37,6 @@ cm:main() {
     esac
 
     cm:config:load_config
-
     cm:checkuser
 
     case "$action" in
