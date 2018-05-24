@@ -181,6 +181,16 @@ Sub Commands
 fetch/view - to retrieve and inspect certificates
 -------------------------------------------------
 
+###    `fetch`
+
+You can fetch the certificate of a live site using
+
+    certmaker fetch URL
+
+Supported URLs include `https://`, `ldaps://` and `ftps://`
+
+###    `view`
+
 You can inspect the contents of a certificate PEM file (typically a block of base-64 data bounded with `BEGIN` and `END` statements) using
 
     certmaker view CERTFILE
