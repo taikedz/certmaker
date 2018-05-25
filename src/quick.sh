@@ -21,14 +21,14 @@ cm:quick() {
     cm:helpcheck quick "$@"
 
     if [[ "$1" = "--edit" ]]; then
-        cm:quick:edit
+        cm:quick:edit_template
 
     else
         cm:quick:host "$@"
     fi
 }
 
-cm:quick:edit() {
+cm:quick:edit_template() {
     local quick_template
     quick_template="$hoststore/quick.cnf"
     if [[ ! -f "$quick_template" ]]; then
@@ -45,6 +45,8 @@ cm:quick:host() {
     cm:quick:ensure_host "$host_name" "$@"
 
     cm:quick:ensure_key "$host_name"
+
+    cm:edit:host "$host_name"
 
     cm:renew:csr-host "$host_name"
 

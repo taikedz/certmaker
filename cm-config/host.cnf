@@ -4,17 +4,16 @@ RANDFILE        = $ENV::HOME/.rnd
 ####################################################################
 # Update the details here !
 [ server_distinguished_name ]
-countryName          = 2 Letter Country Code
+countryName          = 2 Letter Country Code # ---- ADJUST THIS ----
 stateOrProvinceName  = Region
 localityName         = Town or City
 organizationName     = Company
-commonName           = Department
-emailAddress         = Email@Address
+commonName           = Department          # ---- CHANGE THIS ------
+emailAddress         = Email@Address       # -- ALSO  CHANGE THIS --
 
 ####################################################################
 [ req ]
 default_bits       = 4096
-#default_keyfile    = serverkey.pem
 distinguished_name = server_distinguished_name
 req_extensions     = server_req_extensions
 string_mask        = utf8only
@@ -27,11 +26,12 @@ subjectKeyIdentifier = hash
 basicConstraints     = CA:FALSE
 keyUsage             = digitalSignature, keyEncipherment
 subjectAltName       = @alternate_names
-nsComment            = "OpenSSL Generated Certificate"
+nsComment            = "Managed by CertMaker" # -- Maybe change this
 
 ####################################################################
 # Change these to match the DNS names you want the certificate to apply to
-# Ensure this is always the last section in this file
+# Ensure this is always the last section in this file (compatibility with
+#  CertMaker's "quick" mode)
 [ alternate_names ]
 
 #DNS.1  =

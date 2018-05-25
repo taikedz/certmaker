@@ -9,7 +9,7 @@
 #
 #   certmaker new ca
 #   certmaker quick --edit
-#   certmaker quick HOST
+#   certmaker quick HOST DOMAIN ...
 #   certmaker paths [HOST]
 #   certmaker view CERTFILE
 #
@@ -61,14 +61,5 @@
 # Create a new CA:
 #
 #     certmaker new ca
-#
-# ### Certificate viewing and fetching
-#
-# Fetch a site's certificate, and view a certificate file
-#
-#   certmaker fetch { DOMAIN | URL }
-#
-#   certmake view CERTFILE
-#
 #
 ###/doc
