@@ -52,6 +52,10 @@ set -euo pipefail
 #certmaker jks view -k KEYSTORE [-a ALIAS]
 #
 #    View the contents of the keystore, or optionally the contents under the keystore alias
+#
+#certmaker jks rename -k KEYSTORE -a OLDALIAS:NEWALIAS
+#
+#    Rename an old alias to a new one by cloning the old to new, and deleting the old one.
 ###/doc
 
 jks:dispatch() {
@@ -112,18 +116,15 @@ jks:convert_key() {
     out:info "Combining $targetfile and $certfile"
 
     # FIXME this generates error "unable to write 'random state'" even though output/result looks fine...
-    if [[ -z "${ksalias:-}" ]]; then
-        openssl pkcs12 -export -inkey "$targetfile" -in "$certfile"
-    else
-        openssl pkcs12 -export -inkey "$targetfile" -in "$certfile" -alias "$ksalias"
-    fi
+    openssl pkcs12 -export -inkey "$targetfile" -in "$certfile"
 }
 
 jks:gen() {
-    jks:args -k -a || out:fail "Keystore and Alias are required"
+    jks:args -k || out:fail "Keystore is required"
     jks:args -f || :
 
     if [[ -z "${targetfile:-}" ]]; then
+        jks:args -a || out:fail "Alias is required"
         keytool -genkey -alias "$ksalias" -keyalg RSA -keystore "$keystore" -deststoretype pkcs12 # FIXME This is still generateing JKS store??
     else
         jks:convert_key > "$keystore" # provided through $targetfile
