@@ -28,9 +28,6 @@
 # for a quick-start tutorial.
 #
 #
-#
-#
-#
 # 
 # ### Listing profiles
 #
@@ -928,10 +925,18 @@ cm:config:get_temp() {
     echo "$cnftemplates/$1.cnf"
 }
 
+### certmaker template {ca|host} [OUTFILE] Usage:template
+#
+# Create an OpenSSL config file for a CA or a host
+#
+###/doc
+
 cm:template() {
-    local fromfile
-    local target="$1"; shift
-    local outfile="${1:-}"; shift || :
+    cm:helpcheck template "$@"
+
+    local fromfile target outfile
+    target="$1"; shift
+    outfile="${1:-}"; shift || :
 
     case "$target" in
     ca|host)
@@ -1514,11 +1519,15 @@ cm:quick:ensure_host() {
         cm:host:new-host "$host_name"
         cp "$quick_template" "$hostconf"
 
-        for x in $(seq 1 $#); do
-            echo "DNS.$x = $1" >> "$hostconf"
-            shift
-        done
+        cm:quick:enumerate "$@" >> "$hostconf"
     fi
+}
+
+cm:quick:enumerate() {
+    for x in $(seq 1 $#); do
+        echo "DNS.$x = $1"
+        shift
+    done
 }
 
 cm:quick:ensure_key() {
@@ -1558,6 +1567,22 @@ cm:edit:host() {
 	[[ -d "$myhostd" ]] || out:fail "Host '$myhost' does not exist."
 
     cm:util:edit "$myhostd/$myhost.cnf"
+}
+cm:csr() {
+	local name
+
+	name="${1:-}"; shift || out:fail "Specify the base name to create e.g. 'mysite'"
+
+	[[ -f "$name.cnf" ]] || {
+		[[ -n "$*" ]] || out:fail "Specify the websites to certify for (FQDNs, e.g. 'mysite.company.net')"
+
+		cm:template host "$name.cnf"
+		cm:quick:enumerate "$@" >> "$name.cnf"
+		cm:util:edit "$name.cnf"
+	}
+	[[ -f "$name.key" ]] || cm:renew key "$name.cnf" "$name.key"
+	
+	cm:renew csr "$name.key" "$name.cnf" "$name.csr"
 }
 #!/bin/bash
 
@@ -1979,6 +2004,9 @@ cm:main() {
         template)
             cm:template "$@"
             ;;
+	csr)
+		cm:csr "$@"
+		;;
         new)
             cm:new "$@"
             ;;
@@ -2007,7 +2035,7 @@ cm:main() {
 cm:checkuser() {
     local iam=$(whoami)
 
-    if [[ "$cmuser" = root ]]; then
+    if [[ "$cmuser" = root ]] && [[ "$iam" != 'root' ]]; then
         out:fail "CertMaker is installed for the root user. Only the root user can use it now."
     fi
 

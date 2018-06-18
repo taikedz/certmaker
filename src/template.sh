@@ -1,10 +1,18 @@
 #%include out.sh
 #%include ctconf.sh
 
+### certmaker template {ca|host} [OUTFILE] Usage:template
+#
+# Create an OpenSSL config file for a CA or a host
+#
+###/doc
+
 cm:template() {
-    local fromfile
-    local target="$1"; shift
-    local outfile="${1:-}"; shift || :
+    cm:helpcheck template "$@"
+
+    local fromfile target outfile
+    target="$1"; shift
+    outfile="${1:-}"; shift || :
 
     case "$target" in
     ca|host)

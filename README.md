@@ -53,9 +53,6 @@ If you do not install as root, it is placed in `~/.config/certmaker/certmaker.co
 
 Ensure your `EDITOR` environment variable is set to your preferred text editor; if it is not set, CertMaker will try to use Emacs, nano, vim or vi.
 
-Centrally managed hosts
------------------------
-
 New CA
 ---------
 
@@ -91,22 +88,11 @@ Generic CSR and CA activities
 
 ###    Target host
 
-If you simply want to create a CSR for your machine, to send to a remote CA for signing:
+If you simply want to create a CSR for your web host, to send to a remote CA for signing:
 
-Create a configuration for the CSR, and edit it
+	certmaker csr mysite mysite.company.net
 
-    certmaker template host myhost.cnf
-    nano myhost.cnf
-
-If you don't already have a key, create one form the config
-
-    certmaker renew key myhost.cnf
-
-Finally, create the CSR
-
-    certmaker renew csr key-file.key myhost.cnf
-
-This will create a CSR file `myhost.csr` to send to the CA
+This will create an OpenSSL config (annotated) and key, along with the corresponding CSR file `myhost.csr` to send to the CA
 
 
 ###    Certificate Authority

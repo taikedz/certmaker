@@ -9,7 +9,7 @@
 #%include help.sh guide.sh cert-getter.sh
 
 #%include safe.sh autohelp.sh out.sh
-#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh quick.sh edit.sh
+#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh quick.sh edit.sh csr.sh
 #%include jks-manip.sh
 
 cm:main() {
@@ -43,6 +43,9 @@ cm:main() {
         template)
             cm:template "$@"
             ;;
+	csr)
+		cm:csr "$@"
+		;;
         new)
             cm:new "$@"
             ;;
@@ -71,7 +74,7 @@ cm:main() {
 cm:checkuser() {
     local iam=$(whoami)
 
-    if [[ "$cmuser" = root ]]; then
+    if [[ "$cmuser" = root ]] && [[ "$iam" != 'root' ]]; then
         out:fail "CertMaker is installed for the root user. Only the root user can use it now."
     fi
 

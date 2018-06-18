@@ -74,11 +74,15 @@ cm:quick:ensure_host() {
         cm:host:new-host "$host_name"
         cp "$quick_template" "$hostconf"
 
-        for x in $(seq 1 $#); do
-            echo "DNS.$x = $1" >> "$hostconf"
-            shift
-        done
+        cm:quick:enumerate "$@" >> "$hostconf"
     fi
+}
+
+cm:quick:enumerate() {
+    for x in $(seq 1 $#); do
+        echo "DNS.$x = $1"
+        shift
+    done
 }
 
 cm:quick:ensure_key() {

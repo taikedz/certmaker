@@ -20,9 +20,6 @@
 # for a quick-start tutorial.
 #
 #
-#
-#
-#
 # 
 # ### Listing profiles
 #
@@ -35,7 +32,7 @@
 #   certmaker paths HOST
 #
 #
-# ### Creating and signing profiles
+# ### Creating and signing profiles (central management)
 #
 # Create a new host profile, edit it:
 #
@@ -52,15 +49,15 @@
 #     certmaker sign { HOST | CSRFILE [CERTFILE] }
 #
 #
-# ### Generate new CA or templates
-#
-# Generate a new template configuration file
-#
-#   certmaker template { ca | host } [DESTFILE]
+# ### Generate new CA or CSRs
 #
 # Create a new CA:
 #
 #     certmaker new ca
+#
+# Create a new CSR:
+#
+#     certmaker csr CSRNAME [FQDN ...]
 #
 # ### Certificate viewing and fetching
 #
