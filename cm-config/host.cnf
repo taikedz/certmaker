@@ -32,6 +32,7 @@ nsComment            = "Managed by CertMaker" # -- Maybe change this
 # Change these to match the DNS names you want the certificate to apply to
 # Ensure this is always the last section in this file (compatibility with
 #  CertMaker's "quick" mode)
+
 [ alternate_names ]
 
 #DNS.1  =

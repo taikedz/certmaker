@@ -15,7 +15,7 @@
 #
 ###/doc
 
-#%include out.sh autohelp.sh
+#%include out.sh autohelp.sh runmain.sh
 
 function argcheck {
     local arg="$1"; shift
@@ -91,10 +91,13 @@ function get_domain_and_scheme {
 }
 
 cert-getter:main() {
-    cm:helpcheck cert-getter "$@"
+    if [[ "$*" =~ --help ]]; then
+    	autohelp:print cert-getter
+	exit 0
+    fi
 
-    local action="$1"; shift
-    local target="$1"; shift
+    local action="${1:-}"; shift || out:fail "Please specify an aciton view or fetch"
+    local target="${1:-}"; shift || out:fail "Please specify a target file or domain"
 
     argcheck "$action" "action (view|fetch)"
     argcheck "$target" "URL or cert file"
@@ -114,3 +117,5 @@ cert-getter:main() {
         ;;
     esac
 }
+
+runmain cert-getter.sh cert-getter:main "$@"

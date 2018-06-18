@@ -53,7 +53,8 @@ If you do not install as root, it is placed in `~/.config/certmaker/certmaker.co
 
 Ensure your `EDITOR` environment variable is set to your preferred text editor; if it is not set, CertMaker will try to use Emacs, nano, vim or vi.
 
-
+Centrally managed hosts
+-----------------------
 
 New CA
 ---------

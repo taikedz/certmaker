@@ -71,6 +71,10 @@ cm:main() {
 cm:checkuser() {
     local iam=$(whoami)
 
+    if [[ "$cmuser" = root ]]; then
+        out:fail "CertMaker is installed for the root user. Only the root user can use it now."
+    fi
+
     [[ "$cmuser" = "$iam" ]] || {
         out:warn "Loaded Certmaker config was installed for '$cmuser'."
         askuser:confirm "Continue?"

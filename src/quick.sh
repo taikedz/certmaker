@@ -45,9 +45,6 @@ cm:quick:host() {
     cm:quick:ensure_host "$host_name" "$@"
 
     cm:quick:ensure_key "$host_name"
-
-    cm:edit:host "$host_name"
-
     cm:renew:csr-host "$host_name"
 
     cm:sign:host "$host_name"
