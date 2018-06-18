@@ -35,20 +35,26 @@ mkdir -p "$DATAD"/{hosts,default-cnf}
 # ---------------------
 # Deploy
 
-cp bin/certmaker "$BINS/"
+if [[ "$*" =~ cert-getter ]]; then
+	cp bin/cert-getter.sh "$BINS/"
 
-if [[ ! -f "$CONFIGD/certmaker.config" ]]; then
-    sed "
-    s=%CASTORE%=$DATAD/ca=
-    s=%HOSTSTORE%=$DATAD/hosts=
-    s=%DEFAULTCNF%=$DATAD/default-cnf=
-    s=%USER%=$(whoami)=
-    " cm-config/default-certmaker.config > "$CONFIGD/certmaker.config"
+	echo "cert-getter.sh installed"
 else
-	exists "$CONFIGD/certmaker.config"
+	cp bin/certmaker "$BINS/"
+
+	if [[ ! -f "$CONFIGD/certmaker.config" ]]; then
+	    sed "
+	    s=%CASTORE%=$DATAD/ca=
+	    s=%HOSTSTORE%=$DATAD/hosts=
+	    s=%DEFAULTCNF%=$DATAD/default-cnf=
+	    s=%USER%=$(whoami)=
+	    " cm-config/default-certmaker.config > "$CONFIGD/certmaker.config"
+	else
+		exists "$CONFIGD/certmaker.config"
+	fi
+
+	maycp cm-config/host.cnf "$DATAD/default-cnf/host.cnf"
+	maycp cm-config/ca.cnf "$DATAD/default-cnf/ca.cnf"
+
+	echo "Installed certmaker"
 fi
-
-maycp cm-config/host.cnf "$DATAD/default-cnf/host.cnf"
-maycp cm-config/ca.cnf "$DATAD/default-cnf/ca.cnf"
-
-echo "Installed certmaker"

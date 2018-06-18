@@ -110,6 +110,13 @@ If you do not install as root, it is placed in `~/.config/certmaker/certmaker.co
 Ensure your `EDITOR` environment variable is set to your preferred text editor; if it is not set, CertMaker will try to use Emacs, nano, vim or vi.
 
 
+### `cert-getter.sh`
+
+If you only want the certificate fetching and viewing component, install instead
+
+	./install.sh cert-getter
+
+You will have the `cert-getter.sh` command available to you then.
 
 New CA
 ---------
@@ -204,9 +211,9 @@ EOHELP
 #
 ###/doc
 
-##bash-libs: out.sh @ 75ff4139-modified (1.1)
+##bash-libs: out.sh @ 75ff4139 (1.1)
 
-##bash-libs: colours.sh @ 75ff4139-modified (1.1)
+##bash-libs: colours.sh @ 75ff4139 (1.1)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
@@ -236,7 +243,7 @@ EOHELP
 #
 ###/doc
 
-##bash-libs: tty.sh @ 75ff4139-modified (1.1)
+##bash-libs: tty.sh @ 75ff4139 (1.1)
 
 tty:is_ssh() {
     [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
@@ -500,7 +507,7 @@ function out:break {
 if [[ "$MODE_DEBUG_VERBOSE" = true ]]; then
     set -x
 fi
-##bash-libs: autohelp.sh @ 75ff4139-modified (1.1)
+##bash-libs: autohelp.sh @ 75ff4139 (1.1)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -611,6 +618,41 @@ autohelp:check() {
         exit 0
     fi
 }
+##bash-libs: runmain.sh @ 75ff4139 (1.1)
+
+### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
+#
+# Runs the function FUNCTION with ARGUMENTS, only if the runtime
+# name of the script matches SCRIPTNAME
+#
+# This allows you include a main-like function in your library
+# that only runs if you use your lib as an executabl itself.
+#
+# For example, an image archiver could be:
+#
+# 	function archive_images {
+# 		tar czf "$1.tgz" "$@"
+# 	}
+#
+# 	runmain archiveimages.sh archive_images "$@"
+#
+# When included a different script, the runmain call does not fire the lib's function
+#
+# If the lib is compiled/made executable, and named "archiveimages.sh", the function runs.
+#
+# This is similar to `if __name__ == "__main__"` clauses in python
+#
+###/doc
+
+function runmain {
+    local required_name="$1"; shift || :
+    local funcall="$1"; shift || :
+    local scriptname="$(basename "$0")"
+
+    if [[ "$required_name" = "$scriptname" ]]; then
+        "$funcall" "$@"
+    fi
+}
 
 function argcheck {
     local arg="$1"; shift
@@ -680,10 +722,13 @@ function get_domain_and_scheme {
 }
 
 cert-getter:main() {
-    cm:helpcheck cert-getter "$@"
+    if [[ "$*" =~ --help ]]; then
+    	autohelp:print cert-getter
+	exit 0
+    fi
 
-    local action="$1"; shift
-    local target="$1"; shift
+    local action="${1:-}"; shift || out:fail "Please specify an aciton view or fetch"
+    local target="${1:-}"; shift || out:fail "Please specify a target file or domain"
 
     argcheck "$action" "action (view|fetch)"
     argcheck "$target" "URL or cert file"
@@ -704,7 +749,9 @@ cert-getter:main() {
     esac
 }
 
-##bash-libs: safe.sh @ 75ff4139-modified (1.1)
+runmain cert-getter.sh cert-getter:main "$@"
+
+##bash-libs: safe.sh @ 75ff4139 (1.1)
 
 ### Safe mode Usage:bbuild
 #
@@ -718,7 +765,7 @@ cert-getter:main() {
 ###/doc
 
 set -eufo pipefail
-##bash-libs: searchpaths.sh @ 75ff4139-modified (1.1)
+##bash-libs: searchpaths.sh @ 75ff4139 (1.1)
 
 
 # FIXME - set function signature in head of help
@@ -759,7 +806,7 @@ function searchpaths:file_from {
     done
     return 1
 }
-##bash-libs: vars.sh @ 75ff4139-modified (1.1)
+##bash-libs: vars.sh @ 75ff4139 (1.1)
 
 ### Vars library Usage:bbuild
 #
@@ -837,7 +884,7 @@ cm:template() {
         ;;
     esac
 }
-##bash-libs: bincheck.sh @ 75ff4139-modified (1.1)
+##bash-libs: bincheck.sh @ 75ff4139 (1.1)
 
 ### bincheck:get COMMANDS ... Usage:bbuild
 #
@@ -971,7 +1018,7 @@ cm:ca:new-ca() {
 
 	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
 }
-##bash-libs: askuser.sh @ 75ff4139-modified (1.1)
+##bash-libs: askuser.sh @ 75ff4139 (1.1)
 
 ### askuser Usage:bbuild
 # Present the user with questions on stderr

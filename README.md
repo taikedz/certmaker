@@ -26,6 +26,13 @@ If you do not install as root, it is placed in `~/.config/certmaker/certmaker.co
 Ensure your `EDITOR` environment variable is set to your preferred text editor; if it is not set, CertMaker will try to use Emacs, nano, vim or vi.
 
 
+### `cert-getter.sh`
+
+If you only want the certificate fetching and viewing component, install instead
+
+	./install.sh cert-getter
+
+You will have the `cert-getter.sh` command available to you then.
 
 New CA
 ---------
