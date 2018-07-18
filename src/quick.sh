@@ -75,6 +75,8 @@ cm:quick:ensure_host() {
         cp "$quick_template" "$hostconf"
 
         cm:quick:enumerate "$@" >> "$hostconf"
+
+        cm:edit:host "$host_name"
     fi
 }
 

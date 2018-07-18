@@ -40,7 +40,7 @@
 #   certmaker paths HOST
 #
 #
-# ### Creating and signing profiles
+# ### Creating and signing profiles (central management)
 #
 # Create a new host profile, edit it:
 #
@@ -57,15 +57,15 @@
 #     certmaker sign { HOST | CSRFILE [CERTFILE] }
 #
 #
-# ### Generate new CA or templates
-#
-# Generate a new template configuration file
-#
-#   certmaker template { ca | host } [DESTFILE]
+# ### Generate new CA or CSRs
 #
 # Create a new CA:
 #
 #     certmaker new ca
+#
+# Create a new CSR:
+#
+#     certmaker csr CSRNAME [FQDN ...]
 #
 # ### Certificate viewing and fetching
 #
@@ -134,9 +134,6 @@ If you do not install as root, it is placed in `~/.config/certmaker/certmaker.co
 
 Ensure your `EDITOR` environment variable is set to your preferred text editor; if it is not set, CertMaker will try to use Emacs, nano, vim or vi.
 
-Centrally managed hosts
------------------------
-
 New CA
 ---------
 
@@ -172,22 +169,11 @@ Generic CSR and CA activities
 
 ###    Target host
 
-If you simply want to create a CSR for your machine, to send to a remote CA for signing:
+If you simply want to create a CSR for your web host, to send to a remote CA for signing:
 
-Create a configuration for the CSR, and edit it
+	certmaker csr mysite mysite.company.net
 
-    certmaker template host myhost.cnf
-    nano myhost.cnf
-
-If you don't already have a key, create one form the config
-
-    certmaker renew key myhost.cnf
-
-Finally, create the CSR
-
-    certmaker renew csr key-file.key myhost.cnf
-
-This will create a CSR file `myhost.csr` to send to the CA
+This will create an OpenSSL config (annotated) and key, along with the corresponding CSR file `myhost.csr` to send to the CA
 
 
 ###    Certificate Authority
@@ -265,9 +251,9 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: out.sh @ 75ff4139 (1.1)
+##bash-libs: out.sh @ e4c5a615 (1.1)
 
-##bash-libs: colours.sh @ 75ff4139 (1.1)
+##bash-libs: colours.sh @ e4c5a615 (1.1)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
@@ -297,7 +283,7 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: tty.sh @ 75ff4139 (1.1)
+##bash-libs: tty.sh @ e4c5a615 (1.1)
 
 tty:is_ssh() {
     [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
@@ -397,51 +383,6 @@ colours:auto
 #
 ###/doc
 
-### Environment Variables Usage:bbuild
-#
-# MODE_DEBUG : set to 'true' to enable debugging output
-# MODE_DEBUG_VERBOSE : set to 'true' to enable command echoing
-#
-###/doc
-
-: ${MODE_DEBUG=false}
-: ${MODE_DEBUG_VERBOSE=false}
-
-# Internal
-function out:buffer_initialize {
-    OUTPUT_BUFFER_defer=(:)
-}
-out:buffer_initialize
-
-### out:debug MESSAGE Usage:bbuild
-# print a blue debug message to stderr
-# only prints if MODE_DEBUG is set to "true"
-###/doc
-function out:debug {
-    if [[ "$MODE_DEBUG" = true ]]; then
-        echo "${CBBLU}DEBUG: $CBLU$*$CDEF" 1>&2
-    fi
-}
-
-### out:debug:fork [MARKER] Usage:bbuild
-#
-# Pipe the data coming through stdin to stdout
-#
-# If debug mode is on, *also* write the same data to stderr, each line preceded by MARKER
-#
-# Insert this debug fork into pipes to see their output
-#
-###/doc
-function out:debug:fork {
-    if [[ "$MODE_DEBUG" = true ]]; then
-        local MARKER="${1:-DEBUG: }"; shift || :
-
-        cat - | sed -r "s/^/$MARKER/" | tee -a /dev/stderr
-    else
-        cat -
-    fi
-}
-
 ### out:info MESSAGE Usage:bbuild
 # print a green informational message to stderr
 ###/doc
@@ -462,6 +403,12 @@ function out:warn {
 function out:defer {
     OUTPUT_BUFFER_defer[${#OUTPUT_BUFFER_defer[@]}]="$*"
 }
+
+# Internal
+function out:buffer_initialize {
+    OUTPUT_BUFFER_defer=(:)
+}
+out:buffer_initialize
 
 ### out:flush HANDLER ... Usage:bbuild
 #
@@ -515,53 +462,7 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
-
-### out:dump Usage:bbuild
-#
-# Dump stdin contents to console stderr. Requires debug mode.
-#
-# Example
-#
-# 	action_command 2>&1 | out:dump
-#
-###/doc
-
-function out:dump {
-    echo -n "${CBPUR}$*" 1>&2
-    echo -n "$CPUR" 1>&2
-    cat - 1>&2
-    echo -n "$CDEF" 1>&2
-}
-
-### out:break MESSAGE Usage:bbuild
-#
-# Add break points to a script
-#
-# Requires MODE_DEBUG set to true
-#
-# When the script runs, the message is printed with a propmt, and execution pauses.
-#
-# Press return to continue execution.
-#
-# Type `exit`, `quit` or `stop` to stop the program. If the breakpoint is in a subshell,
-#  execution from after the subshell will be resumed.
-#
-###/doc
-
-function out:break {
-    [[ "$MODE_DEBUG" = true ]] || return 0
-
-    echo -en "${CRED}BREAKPOINT: $* >$CDEF " >&2
-    read
-    if [[ "$REPLY" =~ quit|exit|stop ]]; then
-        out:fail "ABORT"
-    fi
-}
-
-if [[ "$MODE_DEBUG_VERBOSE" = true ]]; then
-    set -x
-fi
-##bash-libs: autohelp.sh @ 75ff4139 (1.1)
+##bash-libs: autohelp.sh @ e4c5a615 (1.1)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -672,7 +573,7 @@ autohelp:check() {
         exit 0
     fi
 }
-##bash-libs: runmain.sh @ 75ff4139 (1.1)
+##bash-libs: runmain.sh @ e4c5a615 (1.1)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -811,7 +712,7 @@ cert-getter:main() {
 
 runmain cert-getter.sh cert-getter:main "$@"
 
-##bash-libs: safe.sh @ 75ff4139 (1.1)
+##bash-libs: safe.sh @ e4c5a615 (1.1)
 
 ### Safe mode Usage:bbuild
 #
@@ -825,7 +726,7 @@ runmain cert-getter.sh cert-getter:main "$@"
 ###/doc
 
 set -eufo pipefail
-##bash-libs: searchpaths.sh @ 75ff4139 (1.1)
+##bash-libs: searchpaths.sh @ e4c5a615 (1.1)
 
 
 # FIXME - set function signature in head of help
@@ -852,21 +753,21 @@ function searchpaths:file_from {
     local PATHS="$1"; shift || :
     local FILE="$1"; shift || :
 
-    out:debug "Looking for file [$FILE] amongst [$PATHS]"
+    debug:print "Looking for file [$FILE] amongst [$PATHS]"
 
     for path in $(echo "$PATHS"|tr ':' ' '); do
-        out:debug "Try path: $path"
+        debug:print "Try path: $path"
         local fpath="$path/$FILE"
         if [[ -f "$fpath" ]]; then
             echo "$fpath"
             return 0
         else
-            out:debug "No $fpath"
+            debug:print "No $fpath"
         fi
     done
     return 1
 }
-##bash-libs: vars.sh @ 75ff4139 (1.1)
+##bash-libs: vars.sh @ e4c5a615 (1.1)
 
 ### Vars library Usage:bbuild
 #
@@ -952,7 +853,7 @@ cm:template() {
         ;;
     esac
 }
-##bash-libs: bincheck.sh @ 75ff4139 (1.1)
+##bash-libs: bincheck.sh @ e4c5a615 (1.1)
 
 ### bincheck:get COMMANDS ... Usage:bbuild
 #
@@ -1086,7 +987,7 @@ cm:ca:new-ca() {
 
 	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
 }
-##bash-libs: askuser.sh @ 75ff4139 (1.1)
+##bash-libs: askuser.sh @ e4c5a615 (1.1)
 
 ### askuser Usage:bbuild
 # Present the user with questions on stderr
@@ -1166,7 +1067,7 @@ function askuser:password {
 function askuser:choose_multi {
     local mesg=$1; shift || :
     local choices=$(echo "$*"|sed -r 's/ *, */\n/g')
-    out:debug "CHOICES: $choices"
+    debug:print "CHOICES: $choices"
 
     out:info "$mesg:" 
     local choicelist="$(echo -e "$choices"|egrep '^' -n| sed 's/:/: /')"
@@ -1177,14 +1078,14 @@ function askuser:choose_multi {
         return 1
 
     elif [[ "$sel" =~ $numpat ]] || [[ "$sel" =~ $rangepat ]]; then
-        out:debug "Number choice [$sel]"
+        debug:print "Number choice [$sel]"
         echo -e "$choices" | sed -n "$sel p"
     
     elif [[ "$sel" =~ $listpat ]]; then
         echo "$choicelist" | egrep "^${sel// /|}:" | sed -r 's/^[0-9]+: //'
 
     else
-        out:debug "Pattern choice [$sel]"
+        debug:print "Pattern choice [$sel]"
         echo -e "$choices"  |egrep "$(echo "$sel"|tr " " '|')"
     fi
     return 0
@@ -1520,6 +1421,8 @@ cm:quick:ensure_host() {
         cp "$quick_template" "$hostconf"
 
         cm:quick:enumerate "$@" >> "$hostconf"
+
+        cm:edit:host "$host_name"
     fi
 }
 
@@ -1568,8 +1471,17 @@ cm:edit:host() {
 
     cm:util:edit "$myhostd/$myhost.cnf"
 }
+
+### certmaker csr NAME [FQDN ...] Usage:makecsr
+# 
+# Create a new CSR, generating a config and key file if necessary
+#
+###/doc
+
 cm:csr() {
 	local name
+
+	cm:helpcheck makecsr "$@"
 
 	name="${1:-}"; shift || out:fail "Specify the base name to create e.g. 'mysite'"
 
@@ -1586,9 +1498,9 @@ cm:csr() {
 }
 #!/bin/bash
 
-##bash-libs: args.sh @ 75ff4139 (1.1)
+##bash-libs: args.sh @ e4c5a615 (1.1)
 
-##bash-libs: patterns.sh @ 75ff4139 (1.1)
+##bash-libs: patterns.sh @ e4c5a615 (1.1)
 
 ### Useful patterns Usage:bbuild
 #
