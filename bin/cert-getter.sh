@@ -15,9 +15,9 @@
 #
 ###/doc
 
-##bash-libs: out.sh @ e4c5a615 (1.1)
+##bash-libs: out.sh @ 266ad599 (after 1.1.4)
 
-##bash-libs: colours.sh @ e4c5a615 (1.1)
+##bash-libs: colours.sh @ 266ad599 (after 1.1.4)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
@@ -47,7 +47,7 @@
 #
 ###/doc
 
-##bash-libs: tty.sh @ e4c5a615 (1.1)
+##bash-libs: tty.sh @ 266ad599 (after 1.1.4)
 
 tty:is_ssh() {
     [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
@@ -226,7 +226,7 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
-##bash-libs: autohelp.sh @ e4c5a615 (1.1)
+##bash-libs: autohelp.sh @ 266ad599 (after 1.1.4)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -337,7 +337,7 @@ autohelp:check() {
         exit 0
     fi
 }
-##bash-libs: runmain.sh @ e4c5a615 (1.1)
+##bash-libs: runmain.sh @ 266ad599 (after 1.1.4)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #

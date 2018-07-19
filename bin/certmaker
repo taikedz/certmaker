@@ -251,9 +251,9 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: out.sh @ e4c5a615 (1.1)
+##bash-libs: out.sh @ 266ad599 (after 1.1.4)
 
-##bash-libs: colours.sh @ e4c5a615 (1.1)
+##bash-libs: colours.sh @ 266ad599 (after 1.1.4)
 
 ### Colours for bash Usage:bbuild
 # A series of colour flags for use in outputs.
@@ -283,7 +283,7 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: tty.sh @ e4c5a615 (1.1)
+##bash-libs: tty.sh @ 266ad599 (after 1.1.4)
 
 tty:is_ssh() {
     [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
@@ -462,7 +462,7 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
-##bash-libs: autohelp.sh @ e4c5a615 (1.1)
+##bash-libs: autohelp.sh @ 266ad599 (after 1.1.4)
 
 ### autohelp:print [ SECTION [FILE] ] Usage:bbuild
 # Write your help as documentation comments in your script
@@ -573,7 +573,7 @@ autohelp:check() {
         exit 0
     fi
 }
-##bash-libs: runmain.sh @ e4c5a615 (1.1)
+##bash-libs: runmain.sh @ 266ad599 (after 1.1.4)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -712,7 +712,7 @@ cert-getter:main() {
 
 runmain cert-getter.sh cert-getter:main "$@"
 
-##bash-libs: safe.sh @ e4c5a615 (1.1)
+##bash-libs: safe.sh @ 266ad599 (after 1.1.4)
 
 ### Safe mode Usage:bbuild
 #
@@ -726,7 +726,7 @@ runmain cert-getter.sh cert-getter:main "$@"
 ###/doc
 
 set -eufo pipefail
-##bash-libs: searchpaths.sh @ e4c5a615 (1.1)
+##bash-libs: searchpaths.sh @ 266ad599 (after 1.1.4)
 
 
 # FIXME - set function signature in head of help
@@ -753,21 +753,16 @@ function searchpaths:file_from {
     local PATHS="$1"; shift || :
     local FILE="$1"; shift || :
 
-    debug:print "Looking for file [$FILE] amongst [$PATHS]"
-
     for path in $(echo "$PATHS"|tr ':' ' '); do
-        debug:print "Try path: $path"
         local fpath="$path/$FILE"
         if [[ -f "$fpath" ]]; then
             echo "$fpath"
             return 0
-        else
-            debug:print "No $fpath"
         fi
     done
     return 1
 }
-##bash-libs: vars.sh @ e4c5a615 (1.1)
+##bash-libs: vars.sh @ 266ad599 (after 1.1.4)
 
 ### Vars library Usage:bbuild
 #
@@ -853,7 +848,7 @@ cm:template() {
         ;;
     esac
 }
-##bash-libs: bincheck.sh @ e4c5a615 (1.1)
+##bash-libs: bincheck.sh @ 266ad599 (after 1.1.4)
 
 ### bincheck:get COMMANDS ... Usage:bbuild
 #
@@ -987,7 +982,7 @@ cm:ca:new-ca() {
 
 	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
 }
-##bash-libs: askuser.sh @ e4c5a615 (1.1)
+##bash-libs: askuser.sh @ 266ad599 (after 1.1.4)
 
 ### askuser Usage:bbuild
 # Present the user with questions on stderr
@@ -1067,7 +1062,6 @@ function askuser:password {
 function askuser:choose_multi {
     local mesg=$1; shift || :
     local choices=$(echo "$*"|sed -r 's/ *, */\n/g')
-    debug:print "CHOICES: $choices"
 
     out:info "$mesg:" 
     local choicelist="$(echo -e "$choices"|egrep '^' -n| sed 's/:/: /')"
@@ -1078,14 +1072,12 @@ function askuser:choose_multi {
         return 1
 
     elif [[ "$sel" =~ $numpat ]] || [[ "$sel" =~ $rangepat ]]; then
-        debug:print "Number choice [$sel]"
         echo -e "$choices" | sed -n "$sel p"
     
     elif [[ "$sel" =~ $listpat ]]; then
         echo "$choicelist" | egrep "^${sel// /|}:" | sed -r 's/^[0-9]+: //'
 
     else
-        debug:print "Pattern choice [$sel]"
         echo -e "$choices"  |egrep "$(echo "$sel"|tr " " '|')"
     fi
     return 0
@@ -1498,9 +1490,9 @@ cm:csr() {
 }
 #!/bin/bash
 
-##bash-libs: args.sh @ e4c5a615 (1.1)
+##bash-libs: args.sh @ 266ad599 (after 1.1.4)
 
-##bash-libs: patterns.sh @ e4c5a615 (1.1)
+##bash-libs: patterns.sh @ 266ad599 (after 1.1.4)
 
 ### Useful patterns Usage:bbuild
 #
