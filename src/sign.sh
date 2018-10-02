@@ -43,6 +43,8 @@ cm:sign:csr() {
     else
         :: openssl ca "${opssl_opts[@]}"
     fi
+
+    cat "$castore/authority.cer" >> "$certfile" # Generate a fullchain cert
 }
 
 cm:sign:host() {
