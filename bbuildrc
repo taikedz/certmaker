@@ -1,2 +1,2 @@
 BUILDOUTD=./bin/
-BBFILES=(src/certmaker src/cert-getter.sh)
+BBFILES=(src/certmaker src/cert-getter.sh utilities/generate-dns-alts.sh)
