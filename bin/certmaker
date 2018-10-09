@@ -2165,7 +2165,7 @@ cm:main() {
             cm:renew "$@"
             ;;
         paths)
-            cm:paths "$@"
+            cm:paths:_dispatch "$@"
             ;;
         quick)
             cm:quick "$@"
