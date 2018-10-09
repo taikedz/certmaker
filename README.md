@@ -30,10 +30,10 @@ Create host key and certificate
 
     sudo certmaker quick new-host myhost.net
 
-Renew host certificate, print host asset paths
+Renew host certificate, and create TGZ of asset files
 
     sudo certmaker quick new-host
-    certmaker paths new-host
+    certmaker paths tgz new-host
 
 Copy the assets to the target host.
 

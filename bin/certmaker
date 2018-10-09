@@ -111,10 +111,10 @@ Create host key and certificate
 
     sudo certmaker quick new-host myhost.net
 
-Renew host certificate, print host asset paths
+Renew host certificate, and create TGZ of asset files
 
     sudo certmaker quick new-host
-    certmaker paths new-host
+    certmaker paths tgz new-host
 
 Copy the assets to the target host.
 
@@ -251,30 +251,47 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: out.sh @ 266ad599 (after 1.1.4)
+##bash-libs: out.sh @ cb35065f (1.4)
 
-##bash-libs: colours.sh @ 266ad599 (after 1.1.4)
+##bash-libs: colours.sh @ cb35065f (1.4)
 
-### Colours for bash Usage:bbuild
-# A series of colour flags for use in outputs.
+### Colours for terminal Usage:bbuild
+# A series of shorthand colour flags for use in outputs, and functions to set your own flags.
+#
+# Not all terminals support all colours or modifiers.
 #
 # Example:
 # 	
-# 	echo -e "${CRED}Some red text ${CBBLU} some blue text $CDEF some text in the terminal's default colour")
+# 	echo "${CRED}Some red text ${CBBLU} some blue text. $CDEF Some text in the terminal's default colour")
 #
-# Requires processing of escape characters.
+# Preconfigured colours available:
 #
-# Colours available:
+# CRED, CBRED, HLRED -- red, bright red, highlight red
+# CGRN, CBGRN, HLGRN -- green, bright green, highlight green
+# CYEL, CBYEL, HLYEL -- yellow, bright yellow, highlight yellow
+# CBLU, CBBLU, HLBLU -- blue, bright blue, highlight blue
+# CPUR, CBPUR, HLPUR -- purple, bright purple, highlight purple
+# CTEA, CBTEA, HLTEA -- teal, bright teal, highlight teal
+# CBLA, CBBLA, HLBLA -- black, bright red, highlight red
+# CWHI, CBWHI, HLWHI -- white, bright red, highlight red
 #
-# CRED, CBRED, HLRED -- red, bold red, highlight red
-# CGRN, CBGRN, HLGRN -- green, bold green, highlight green
-# CYEL, CBYEL, HLYEL -- yellow, bold yellow, highlight yellow
-# CBLU, CBBLU, HLBLU -- blue, bold blue, highlight blue
-# CPUR, CBPUR, HLPUR -- purple, bold purple, highlight purple
-# CTEA, CBTEA, HLTEA -- teal, bold teal, highlight teal
+# Modifiers available:
 #
-# CDEF -- switches to the terminal default
-# CUNL -- add underline
+# CBON - activate bright
+# CDON - activate dim
+# ULON - activate underline
+# RVON - activate reverse (switch foreground and background)
+# SKON - activate strikethrough
+# 
+# Resets available:
+#
+# CNORM -- turn off bright or dim, without affecting other modifiers
+# ULOFF -- turn off highlighting
+# RVOFF -- turn off inverse
+# SKOFF -- turn off strikethrough
+# HLOFF -- turn off highlight
+#
+# CDEF -- turn off all colours and modifiers(switches to the terminal default)
 #
 # Note that highlight and underline must be applied or re-applied after specifying a colour.
 #
@@ -283,7 +300,7 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: tty.sh @ 266ad599 (after 1.1.4)
+##bash-libs: tty.sh @ cb35065f (1.4)
 
 tty:is_ssh() {
     [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
@@ -293,10 +310,18 @@ tty:is_pipe() {
     [[ ! -t 1 ]]
 }
 
-### colours:check ARGS Usage:bbuild
+### colours:check ARGS ... Usage:bbuild
 #
 # Check the args to see if there's a `--color=always` or `--color=never`
 #   and reload the colours appropriately
+#
+#   main() {
+#       colours:check "$@"
+#
+#       echo "${CGRN}Green only in tty or if --colours=always !${CDEF}"
+#   }
+#
+#   main "$@"
 #
 ###/doc
 colours:check() {
@@ -310,6 +335,74 @@ colours:check() {
     return 0
 }
 
+### colours:set CODE Usage:bbuild
+# Set an explicit colour code - e.g.
+#
+#   echo "$(colours:set "33;2")Dim yellow text${CDEF}"
+#
+# See SGR Colours definitions
+#   <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters>
+###/doc
+colours:set() {
+    # We use `echo -e` here rather than directly embedding a binary character
+    if [[ "$COLOURS_ON" = false ]]; then
+        return 0
+    else
+        echo -e "\033[${1}m"
+    fi
+}
+
+colours:define() {
+
+    # Shorthand colours
+
+    export CBLA="$(colours:set "21;30")"
+    export CRED="$(colours:set "21;31")"
+    export CGRN="$(colours:set "21;32")"
+    export CYEL="$(colours:set "21;33")"
+    export CBLU="$(colours:set "21;34")"
+    export CPUR="$(colours:set "21;35")"
+    export CTEA="$(colours:set "21;36")"
+    export CWHI="$(colours:set "21;37")"
+
+    export CBBLA="$(colours:set "1;30")"
+    export CBRED="$(colours:set "1;31")"
+    export CBGRN="$(colours:set "1;32")"
+    export CBYEL="$(colours:set "1;33")"
+    export CBBLU="$(colours:set "1;34")"
+    export CBPUR="$(colours:set "1;35")"
+    export CBTEA="$(colours:set "1;36")"
+    export CBWHI="$(colours:set "1;37")"
+
+    export HLBLA="$(colours:set "40")"
+    export HLRED="$(colours:set "41")"
+    export HLGRN="$(colours:set "42")"
+    export HLYEL="$(colours:set "43")"
+    export HLBLU="$(colours:set "44")"
+    export HLPUR="$(colours:set "45")"
+    export HLTEA="$(colours:set "46")"
+    export HLWHI="$(colours:set "47")"
+
+    # Modifiers
+    
+    export CBON="$(colours:set "1")"
+    export CDON="$(colours:set "2")"
+    export ULON="$(colours:set "4")"
+    export RVON="$(colours:set "7")"
+    export SKON="$(colours:set "9")"
+
+    # Resets
+
+    export CBNRM="$(colours:set "22")"
+    export HLOFF="$(colours:set "49")"
+    export ULOFF="$(colours:set "24")"
+    export RVOFF="$(colours:set "27")"
+    export SKOFF="$(colours:set "29")"
+
+    export CDEF="$(colours:set "0")"
+
+}
+
 colours:auto() {
     if tty:is_pipe ; then
         COLOURS_ON=false
@@ -319,60 +412,6 @@ colours:auto() {
 
     colours:define
     return 0
-}
-
-colours:define() {
-    if [[ "$COLOURS_ON" = false ]]; then
-
-        export CRED=''
-        export CGRN=''
-        export CYEL=''
-        export CBLU=''
-        export CPUR=''
-        export CTEA=''
-
-        export CBRED=''
-        export CBGRN=''
-        export CBYEL=''
-        export CBBLU=''
-        export CBPUR=''
-        export CBTEA=''
-
-        export HLRED=''
-        export HLGRN=''
-        export HLYEL=''
-        export HLBLU=''
-        export HLPUR=''
-        export HLTEA=''
-
-        export CDEF=''
-
-    else
-
-        export CRED=$(echo -e "\033[0;31m")
-        export CGRN=$(echo -e "\033[0;32m")
-        export CYEL=$(echo -e "\033[0;33m")
-        export CBLU=$(echo -e "\033[0;34m")
-        export CPUR=$(echo -e "\033[0;35m")
-        export CTEA=$(echo -e "\033[0;36m")
-
-        export CBRED=$(echo -e "\033[1;31m")
-        export CBGRN=$(echo -e "\033[1;32m")
-        export CBYEL=$(echo -e "\033[1;33m")
-        export CBBLU=$(echo -e "\033[1;34m")
-        export CBPUR=$(echo -e "\033[1;35m")
-        export CBTEA=$(echo -e "\033[1;36m")
-
-        export HLRED=$(echo -e "\033[41m")
-        export HLGRN=$(echo -e "\033[42m")
-        export HLYEL=$(echo -e "\033[43m")
-        export HLBLU=$(echo -e "\033[44m")
-        export HLPUR=$(echo -e "\033[45m")
-        export HLTEA=$(echo -e "\033[46m")
-
-        export CDEF=$(echo -e "\033[0m")
-
-    fi
 }
 
 colours:auto
@@ -462,14 +501,19 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
-##bash-libs: autohelp.sh @ 266ad599 (after 1.1.4)
 
-### autohelp:print [ SECTION [FILE] ] Usage:bbuild
+##bash-libs: autohelp.sh @ cb35065f (1.4)
+
+### Autohelp Usage:bbuild
+#
+# Autohelp provides some simple facilities for defining help as comments in your code.
+# It provides several functions for printing specially formatted comment sections.
+#
 # Write your help as documentation comments in your script
 #
-# If you need to output the help from your script, or a file, call the
+# To output a named section from your script, or a file, call the
 # `autohelp:print` function and it will print the help documentation
-# in the current script to stdout
+# in the current script, or specified file, to stdout
 #
 # A help comment looks like this:
 #
@@ -482,7 +526,11 @@ function out:error {
 #    #
 #    ###/doc
 #
-# You can set a different help section by specifying a subsection
+# It can then be printed from the same script by simply calling
+#
+#   autohelp:print
+#
+# You can print a different section by specifying a different name
 #
 # 	autohelp:print section2
 #
@@ -492,43 +540,112 @@ function out:error {
 # 	# <some content>
 # 	###/doc
 #
-# You can set a different comment character by setting the 'HELPCHAR' environment variable:
+# You can set a different comment character by setting the 'HELPCHAR' environment variable.
+# Typically, you might want to print comments you set in a INI config file, for example
 #
-# 	HELPCHAR=%
+# 	HELPCHAR=";" autohelp:print help config-file.ini
+# 
+# Which would then find comments defined like this in `config-file.ini`:
 #
+#   ;;; Main config Usage:help
+#   ; Help comments in a config file
+#   ; may start with a different comment character
+#   ;;;/doc
+#
+#
+#
+# Example usage in a multi-function script:
+#
+#   #!/bin/bash
+#
+#   ### Main help Usage:help
+#   # The main help
+#   ###/doc
+#
+#   ### Feature One Usage:feature_1
+#   # Help text for the first feature
+#   ###/doc
+#
+#   feature1() {
+#       autohelp:check_section feature_1 "$@"
+#       echo "Feature I"
+#   }
+#
+#   ### Feature Two Usage:feature_2
+#   # Help text for the second feature
+#   ###/doc
+#
+#   feature2() {
+#       autohelp:check_section feature_2 "$@"
+#       echo "Feature II"
+#   }
+#
+#   main() {
+#       if [[ -z "$*" ]]; then
+#           ### No command specified Usage:no-command
+#           #No command specified. Try running with `--help`
+#           ###/doc
+#
+#           autohelp:print no-command
+#           exit 1
+#       fi
+#
+#       case "$1" in
+#       feature1|feature2)
+#           "$1" "$@"            # Pass the global script arguments through
+#           ;;
+#       *)
+#           autohelp:check "$@"  # Check if main help was asked for, if so, exits
+#
+#           # Main help not requested, return error
+#           echo "Unknown feature"
+#           exit 1
+#           ;;
+#       esac
+#   }
+#
+#   main "$@"
+#
+###/doc
+
+### autohelp:print [ SECTION [FILE] ] Usage:bbuild
+# Print the specified section, in the specified file.
+#
+# If no file is specified, prints for current script file.
+# If no section is specified, defaults to "help"
 ###/doc
 
 HELPCHAR='#'
 
-function autohelp:print {
-    local SECTION_STRING="${1:-}"; shift || :
-    local TARGETFILE="${1:-}"; shift || :
-    [[ -n "$SECTION_STRING" ]] || SECTION_STRING=help
-    [[ -n "$TARGETFILE" ]] || TARGETFILE="$0"
+autohelp:print() {
+    local input_line
+    local section_string="${1:-}"; shift || :
+    local target_file="${1:-}"; shift || :
+    [[ -n "$section_string" ]] || section_string=help
+    [[ -n "$target_file" ]] || target_file="$0"
 
-        echo -e "\n$(basename "$TARGETFILE")\n===\n"
-        local SECSTART='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$SECTION_STRING"'\s*$'
-        local SECEND='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s*/doc\s*$'
-        local insec=false
+    #echo -e "\n$(basename "$target_file")\n===\n"
+    local sec_start='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$section_string"'\s*$'
+    local sec_end='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s*/doc\s*$'
+    local in_section=false
 
-        while read secline; do
-                if [[ "$secline" =~ $SECSTART ]]; then
-                        insec=true
-                        echo -e "\n${BASH_REMATCH[1]}\n---\n"
+    while read input_line; do
+        if [[ "$input_line" =~ $sec_start ]]; then
+            in_section=true
+            echo -e "\n${BASH_REMATCH[1]}\n======="
 
-                elif [[ "$insec" = true ]]; then
-                        if [[ "$secline" =~ $SECEND ]]; then
-                                insec=false
-                        else
-                echo "$secline" | sed -r "s/^\s*$HELPCHAR//g"
-                        fi
-                fi
-        done < "$TARGETFILE"
-
-        if [[ "$insec" = true ]]; then
-                echo "WARNING: Non-terminated help block." 1>&2
+        elif [[ "$in_section" = true ]]; then
+            if [[ "$input_line" =~ $sec_end ]]; then
+                in_section=false
+            else
+                echo "$input_line" | sed -r "s/^\s*$HELPCHAR/ /;s/^  (\S)/\1/"
+            fi
         fi
-    echo ""
+    done < "$target_file"
+
+    if [[ "$in_section" = true ]]; then
+            out:fail "Non-terminated help block."
+    fi
 }
 
 ### autohelp:paged Usage:bbuild
@@ -536,44 +653,37 @@ function autohelp:print {
 # Display the help in the pager defined in the PAGER environment variable
 #
 ###/doc
-function autohelp:paged {
+autohelp:paged() {
     : ${PAGER=less}
     autohelp:print "$@" | $PAGER
 }
 
-### autohelp:check Usage:bbuild
+### autohelp:check ARGS ... Usage:bbuild
 #
-# Automatically print help and exit if "--help" is detected in arguments
-#
-# Example use:
-#
-#    #!/bin/bash
-#
-#    ### Some help Usage:help
-#    #
-#    # Some help text
-#    #
-#    ###/doc
-#
-#    #%include autohelp.sh
-#
-#    main() {
-#        autohelp:check "$@"
-#
-#        # now add your code
-#    }
-#
-#    main "$@"
+# Automatically print "help" sections and exit, if "--help" is detected in arguments
 #
 ###/doc
 autohelp:check() {
-    if [[ "$*" =~ --help ]]; then
-        cols="$(tput cols)"
-        autohelp:print | fold -w "$cols" -s || autohelp:print
-        exit 0
-    fi
+    autohelp:check_section "help" "$@"
 }
-##bash-libs: runmain.sh @ 266ad599 (after 1.1.4)
+
+### autohelp:check_section SECTION ARGS ... Usage:bbuild
+# Automatically print documentation for named section and exit, if "--help" is detected in arguments
+#
+###/doc
+autohelp:check_section() {
+    local section arg
+    section="${1:-}"; shift || out:fail "No help section specified"
+
+    for arg in "$@"; do
+        if [[ "$arg" =~ --help ]]; then
+            cols="$(tput cols)"
+            autohelp:print "$section" | fold -w "$cols" -s || autohelp:print "$section"
+            exit 0
+        fi
+    done
+}
+##bash-libs: runmain.sh @ cb35065f (1.4)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -712,21 +822,48 @@ cert-getter:main() {
 
 runmain cert-getter.sh cert-getter:main "$@"
 
-##bash-libs: safe.sh @ 266ad599 (after 1.1.4)
+##bash-libs: safe.sh @ cb35065f (1.4)
 
 ### Safe mode Usage:bbuild
 #
-# Set safe mode options
+# Set global safe mode options
 #
-# * Script bails on error
-# * Accessing a variable that is not set is an error
+# * Script bails if a statement or command returns non-zero status
+#   * except when in a conditional statement
+# * Accessing a variable that is not set is an error, causing non-zero status of the operation
 # * If a file glob does not expand, cause an error condition
-# * If a component of a pipe fails, the entire pipe is a failure
+# * If a component of a pipe fails, the entire pipe statement returns non-zero
+#
+# Splitting over spaces
+#
+# You can also switch space splitting on or off (normal bash default is 'on')
+#
+# Given a function `foo()` that returns multiple lines, which may each have spaces in them, use safe splitting to return each item into an array as its own item, without splitting over spaces.
+#
+#   safe:space-split off
+#   mylist=(foo)
+#   safe:space-split on
+#
+# Having space splitting on causes statements like `echo "$*"` to print each argument on its own line.
 #
 ###/doc
 
 set -eufo pipefail
-##bash-libs: searchpaths.sh @ 266ad599 (after 1.1.4)
+
+safe:space-split() {
+    case "$1" in
+    off)
+        export IFS=$'\t\n'
+        ;;
+    on)
+        export IFS=$' \t\n'
+        ;;
+    *)
+        out:fail "API error: bad use of safe:split - must be 'on' or 'off' not '$1'"
+        ;;
+    esac
+}
+##bash-libs: searchpaths.sh @ cb35065f (1.4)
 
 
 # FIXME - set function signature in head of help
@@ -762,7 +899,7 @@ function searchpaths:file_from {
     done
     return 1
 }
-##bash-libs: vars.sh @ 266ad599 (after 1.1.4)
+##bash-libs: vars.sh @ cb35065f (1.4)
 
 ### Vars library Usage:bbuild
 #
@@ -770,39 +907,36 @@ function searchpaths:file_from {
 #
 ###/doc
 
-### vars:require VARNAME ... Usage:bbuild
+### vars:require RETURNVAR VARNAMES ... Usage:bbuild
 #
 # Check a list of environment variables such that none are non-empty.
 #
-# If variables are empty/not set, the name is echoed.
+# If variables are empty/not set, the name is added to the return holder variable.
 #
-# Returns the number of missing variables.
+# Example:
 #
 #    myvarA=one
 #    myvarB=
 #    myvarC=three
 #
-#    missing="$(vars:require myvarA myvarB myvarC)"
-#
-#    if [[ -n "$missing" ]]; then
-#        out:fail "Variables were not set : [$missing]"
+#    if ! vars:require missing_vars myvarA myvarB myvarC ; then
+#        echo "The following variables are not set: $missing_vars"
 #    fi
 #
 ###/doc
 
 vars:require() {
-    local missing=(:)
+    local missing_var="${1:-}" ; shift || out:fail "Internal error: no aruments passed for var check"
+    local res=0
 
     for varname in "$@"; do
-        echo "[[ -n "\$$varname" ]]" | bash || {
-            missing[${#missing[@]}]="$varname"
+        . <(echo "[[ -n \"\${$varname:-}\" ]]") || {
+            . <(echo "$missing_var=\"\${$missing_var:-} $varname\"")
+            res=1
         }
     done
 
-    missing=("${missing[@]:1}")
-
-    echo "${missing[*]}"
-    return "${#missing[@]}"
+    return "$res"
 }
 
 CERTMAKER_confpaths=".:$HOME/.config/certmaker:/etc/certmaker"
@@ -848,7 +982,7 @@ cm:template() {
         ;;
     esac
 }
-##bash-libs: bincheck.sh @ 266ad599 (after 1.1.4)
+##bash-libs: bincheck.sh @ cb35065f (1.4)
 
 ### bincheck:get COMMANDS ... Usage:bbuild
 #
@@ -982,7 +1116,7 @@ cm:ca:new-ca() {
 
 	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
 }
-##bash-libs: askuser.sh @ 266ad599 (after 1.1.4)
+##bash-libs: askuser.sh @ cb35065f (1.4)
 
 ### askuser Usage:bbuild
 # Present the user with questions on stderr
@@ -1027,6 +1161,7 @@ function askuser:ask {
 ###/doc
 function askuser:password {
     read -s -p "$* : " 1>&2
+    echo >&2
     echo "$REPLY"
 }
 
@@ -1064,7 +1199,7 @@ function askuser:choose_multi {
     local choices=$(echo "$*"|sed -r 's/ *, */\n/g')
 
     out:info "$mesg:" 
-    local choicelist="$(echo -e "$choices"|egrep '^' -n| sed 's/:/: /')"
+    local choicelist="$(echo -e "$choices"|grep -E '^' -n| sed 's/:/: /')"
     echo "$choicelist" 1>&2
     
     local sel=$(askuser:ask "Choice")
@@ -1075,10 +1210,10 @@ function askuser:choose_multi {
         echo -e "$choices" | sed -n "$sel p"
     
     elif [[ "$sel" =~ $listpat ]]; then
-        echo "$choicelist" | egrep "^${sel// /|}:" | sed -r 's/^[0-9]+: //'
+        echo "$choicelist" | grep -E "^${sel// /|}:" | sed -r 's/^[0-9]+: //'
 
     else
-        echo -e "$choices"  |egrep "$(echo "$sel"|tr " " '|')"
+        echo -e "$choices"  |grep -E "$(echo "$sel"|tr " " '|')"
     fi
     return 0
 }
@@ -1150,6 +1285,8 @@ cm:sign:csr() {
     else
         :: openssl ca "${opssl_opts[@]}"
     fi
+
+    cat "$castore/authority.cer" >> "$certfile" # Generate a fullchain cert
 }
 
 cm:sign:host() {
@@ -1318,15 +1455,26 @@ cm:renew:csr-host() {
 
     cm:renew:csr-file "$hostd/${host_name}.key" "$hostd/${host_name}.cnf" "$hostd/${host_name}.csr"
 }
-cm:paths() {
-    local host_name hostd
-
-    host_name="${1:-}"; shift || {
+cm:paths:_dispatch() {
+    . <(args:use:local ?action ?host_name -- "$@") ; 
+    if [[ -z "$action" ]]; then
         cm:paths:list
         return
-    }
+    fi
 
-    hostd="$hoststore/$host_name"
+    if [[ "$action" = "tgz" ]]; then
+        cm:paths:give-tgz "$host_name" "$@"
+
+    elif [[ "$action" = "show" ]]; then
+        cm:paths "$host_name"
+    else
+        out:fail "Unknown action - try 'tgz HOSTNAME [TARNAME]' or 'show HOSTNAME'"
+    fi
+}
+
+cm:paths:show() {
+    . <(args:use:local host_name -- "$@") ; 
+    local hostd="$hoststore/$host_name"
 
     [[ -d "$hostd" ]] || out:fail "Unknown host profile '$host_name'"
 
@@ -1335,6 +1483,19 @@ cm:paths() {
 
 cm:paths:list() {
     find "$hoststore" -name '*.cnf' -exec dirname {} \; | sed "s|$hoststore/||"
+}
+
+cm:paths:give-tgz() {
+    . <(args:use:local host_name ?tarname -- "$@") ; 
+    local hostd="$hoststore/$host_name"
+
+    [[ -d "$hostd" ]] || out:fail "Unknown host profile '$host_name'"
+
+    if [[ -z "$tarname" ]]; then
+        tarname=./"$host_name-certkey.tgz"
+    fi
+
+    tar czf "$tarname" -C "$hostd" "$host_name.cer" "$host_name.key"
 }
 ### Quick mode Usage:quick
 #
@@ -1490,9 +1651,9 @@ cm:csr() {
 }
 #!/bin/bash
 
-##bash-libs: args.sh @ 266ad599 (after 1.1.4)
+##bash-libs: args.sh @ cb35065f (1.4)
 
-##bash-libs: patterns.sh @ 266ad599 (after 1.1.4)
+##bash-libs: patterns.sh @ cb35065f (1.4)
 
 ### Useful patterns Usage:bbuild
 #
@@ -1546,7 +1707,7 @@ export PAT_email="$PAT_filename@$PAT_filename.$PAT_cvar"
 #
 ###/doc
 
-function args:get {
+args:get() {
     local seek="$1"; shift || :
 
     if [[ "$seek" =~ $PAT_num ]]; then
@@ -1570,7 +1731,7 @@ function args:get {
     fi
 }
 
-function args:get_short {
+args:get_short() {
     local token="$1"; shift || :
     while [[ -n "$*" ]]; do
         local item="$1"; shift || :
@@ -1583,7 +1744,7 @@ function args:get_short {
     return 1
 }
 
-function args:get_long {
+args:get_long() {
     local token="$1"; shift || :
     local tokenpat="^$token=(.*)$"
 
@@ -1616,7 +1777,7 @@ function args:get_long {
 #
 ###/doc
 
-function args:has {
+args:has() {
     local token="$1"; shift || :
     for item in "$@"; do
         if [[ "$token" = "$item" ]]; then
@@ -1645,7 +1806,7 @@ function args:has {
 #
 ###/doc
 
-function args:after {
+args:after() {
     local token="$1"; shift || :
     
     local current_token="$1"; shift || :
@@ -1654,6 +1815,86 @@ function args:after {
     done
 
     RETARR_ARGSAFTER=("$@")
+}
+
+### args:use ARGNAMES ... -- ARGVALUES ... Usage:bbuild
+# 
+# Consume arguments into named global variables.
+#
+# If not enough argument values are found, the first named variable that failed to be assigned is printed as error
+#
+# Example:
+#
+#   #%include out.sh
+#   #%include args.sh
+#
+#   get_parameters() {
+#       . <(args:use INFILE OUTFILE -- "$@")
+#
+#       [[ -f "$INFILE" ]]  || out:fail "Input file '$INFILE' does not exist"
+#       [[ -f "$OUTFILE" ]] || out:fail "Output file '$OUTFILE' does not exist"
+#   }
+#
+#   main() {
+#       get_parameters "$@"
+#
+#       echo "$INFILE will be converted to $OUTFILE"
+#   }
+#
+#   main "$@"
+#
+###/doc
+args:use() {
+    local argname arglist undef_f
+    arglist=(:)
+    for argname in "$@"; do
+        [[ "$argname" != -- ]] || break
+        [[ "$argname" =~ ^\??[0-9a-zA-Z_]+$ ]] || out:fail "Internal: Not a valid argument name '$argname'"
+
+        arglist+=("$argname")
+    done
+
+    for argname in "${arglist[@]:1}"; do
+        if [[ "$argname" =~ ^\? ]]; then
+            argname="${argname:1}"
+            undef_f=":"
+        else
+            undef_f="out:fail \"Internal : could not get '$argname'\""
+        fi
+
+        echo "$ARGSLIB_scope $argname=\"\${1:-}\"; shift || $undef_f"
+    done
+}
+
+
+### args:use:local ARGNAMES ... -- ARGVALUES ... Usage:bbuild
+# 
+# Consume arguments into named variables. You need to use process subtitution and sourcing
+#   to call the function, so that it affects the scope in your function.
+#
+# If not enough argument values are found, the named variable that failed to be assigned is printed as error
+#
+# Example:
+#
+#   #%include out.sh
+#   #%include args.sh
+#
+#   person() {
+#       . <(args:use:local name email -- "$@")
+#
+#       echo "$name <$email>"
+#
+#       # $1 and $2 have been consumed into $name and $email
+#       # The rest remains available in $* :
+#       
+#       echo "Additional notes: $*"
+#   }
+#
+#   person "Jo Smith" "jsmith@exam0ple.com" Some details
+#
+###/doc
+args:use:local() {
+    ARGSLIB_scope=local args:use "$@"
 }
 
 set -euo pipefail
