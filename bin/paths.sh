@@ -1,4 +1,5 @@
-$%function cm:paths:_dispatch(?action ?host_name) {
+cm:paths:_dispatch() {
+    . <(args:use:local ?action ?host_name -- "$@") ; 
     if [[ -z "$action" ]]; then
         cm:paths:list
         return
@@ -14,7 +15,8 @@ $%function cm:paths:_dispatch(?action ?host_name) {
     fi
 }
 
-$%function cm:paths:show(host_name) {
+cm:paths:show() {
+    . <(args:use:local host_name -- "$@") ; 
     local hostd="$hoststore/$host_name"
 
     [[ -d "$hostd" ]] || out:fail "Unknown host profile '$host_name'"
@@ -26,7 +28,8 @@ cm:paths:list() {
     find "$hoststore" -name '*.cnf' -exec dirname {} \; | sed "s|$hoststore/||"
 }
 
-$%function cm:paths:give-tgz(host_name ?tarname) {
+cm:paths:give-tgz() {
+    . <(args:use:local host_name ?tarname -- "$@") ; 
     local hostd="$hoststore/$host_name"
 
     [[ -d "$hostd" ]] || out:fail "Unknown host profile '$host_name'"
