@@ -8,7 +8,7 @@ $%function cm:paths:_dispatch(?action ?host_name) {
         cm:paths:give-tgz "$host_name" "$@"
 
     elif [[ "$action" = "show" ]]; then
-        cm:paths "$host_name"
+        cm:paths:show "$host_name"
     else
         out:fail "Unknown action - try 'tgz HOSTNAME [TARNAME]' or 'show HOSTNAME'"
     fi

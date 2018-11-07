@@ -53,7 +53,7 @@ cm:quick:host() {
     # but the keys to stdout
     # in case user is grepping for the files
     echo -n "$CBBLU" >&2
-    echo "$(cm:paths "$host_name")"
+    echo "$(cm:paths:show "$host_name")"
     echo -n "$CDEF" >&2
 }
 

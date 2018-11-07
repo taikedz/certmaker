@@ -251,9 +251,17 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: out.sh @ cb35065f (1.4)
+##bash-libs: tty.sh @ bf310b32 (1.4.1)
 
-##bash-libs: colours.sh @ cb35065f (1.4)
+tty:is_ssh() {
+    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
+}
+
+tty:is_pipe() {
+    [[ ! -t 1 ]]
+}
+
+##bash-libs: colours.sh @ bf310b32 (1.4.1)
 
 ### Colours for terminal Usage:bbuild
 # A series of shorthand colour flags for use in outputs, and functions to set your own flags.
@@ -299,16 +307,6 @@ ENDOFEXTENDEDGUIDE
 #   You can override this by calling `colours:check --color=always` at the start of your script
 #
 ###/doc
-
-##bash-libs: tty.sh @ cb35065f (1.4)
-
-tty:is_ssh() {
-    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
-}
-
-tty:is_pipe() {
-    [[ ! -t 1 ]]
-}
 
 ### colours:check ARGS ... Usage:bbuild
 #
@@ -356,14 +354,14 @@ colours:define() {
 
     # Shorthand colours
 
-    export CBLA="$(colours:set "21;30")"
-    export CRED="$(colours:set "21;31")"
-    export CGRN="$(colours:set "21;32")"
-    export CYEL="$(colours:set "21;33")"
-    export CBLU="$(colours:set "21;34")"
-    export CPUR="$(colours:set "21;35")"
-    export CTEA="$(colours:set "21;36")"
-    export CWHI="$(colours:set "21;37")"
+    export CBLA="$(colours:set "30")"
+    export CRED="$(colours:set "31")"
+    export CGRN="$(colours:set "32")"
+    export CYEL="$(colours:set "33")"
+    export CBLU="$(colours:set "34")"
+    export CPUR="$(colours:set "35")"
+    export CTEA="$(colours:set "36")"
+    export CWHI="$(colours:set "37")"
 
     export CBBLA="$(colours:set "1;30")"
     export CBRED="$(colours:set "1;31")"
@@ -415,6 +413,8 @@ colours:auto() {
 }
 
 colours:auto
+
+##bash-libs: out.sh @ bf310b32 (1.4.1)
 
 ### Console output handlers Usage:bbuild
 #
@@ -502,7 +502,7 @@ function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
 
-##bash-libs: autohelp.sh @ cb35065f (1.4)
+##bash-libs: autohelp.sh @ bf310b32 (1.4.1)
 
 ### Autohelp Usage:bbuild
 #
@@ -683,7 +683,7 @@ autohelp:check_section() {
         fi
     done
 }
-##bash-libs: runmain.sh @ cb35065f (1.4)
+##bash-libs: runmain.sh @ bf310b32 (1.4.1)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -822,7 +822,7 @@ cert-getter:main() {
 
 runmain cert-getter.sh cert-getter:main "$@"
 
-##bash-libs: safe.sh @ cb35065f (1.4)
+##bash-libs: safe.sh @ bf310b32 (1.4.1)
 
 ### Safe mode Usage:bbuild
 #
@@ -863,8 +863,8 @@ safe:space-split() {
         ;;
     esac
 }
-##bash-libs: searchpaths.sh @ cb35065f (1.4)
 
+##bash-libs: searchpaths.sh @ bf310b32 (1.4.1)
 
 # FIXME - set function signature in head of help
 ### searchpaths:file_from PATHDEF FILE Usage:bbuild
@@ -899,7 +899,7 @@ function searchpaths:file_from {
     done
     return 1
 }
-##bash-libs: vars.sh @ cb35065f (1.4)
+##bash-libs: vars.sh @ bf310b32 (1.4.1)
 
 ### Vars library Usage:bbuild
 #
@@ -982,7 +982,7 @@ cm:template() {
         ;;
     esac
 }
-##bash-libs: bincheck.sh @ cb35065f (1.4)
+##bash-libs: bincheck.sh @ bf310b32 (1.4.1)
 
 ### bincheck:get COMMANDS ... Usage:bbuild
 #
@@ -1116,12 +1116,12 @@ cm:ca:new-ca() {
 
 	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
 }
-##bash-libs: askuser.sh @ cb35065f (1.4)
+
+##bash-libs: askuser.sh @ bf310b32 (1.4.1)
 
 ### askuser Usage:bbuild
 # Present the user with questions on stderr
 ###/doc
-
 
 yespat='^(yes|YES|y|Y)$'
 numpat='^[0-9]+$'
@@ -1466,7 +1466,7 @@ cm:paths:_dispatch() {
         cm:paths:give-tgz "$host_name" "$@"
 
     elif [[ "$action" = "show" ]]; then
-        cm:paths "$host_name"
+        cm:paths:show "$host_name"
     else
         out:fail "Unknown action - try 'tgz HOSTNAME [TARNAME]' or 'show HOSTNAME'"
     fi
@@ -1495,7 +1495,9 @@ cm:paths:give-tgz() {
         tarname=./"$host_name-certkey.tgz"
     fi
 
+    ( set -x
     tar czf "$tarname" -C "$hostd" "$host_name.cer" "$host_name.key"
+    )
 }
 ### Quick mode Usage:quick
 #
@@ -1552,7 +1554,7 @@ cm:quick:host() {
     # but the keys to stdout
     # in case user is grepping for the files
     echo -n "$CBBLU" >&2
-    echo "$(cm:paths "$host_name")"
+    echo "$(cm:paths:show "$host_name")"
     echo -n "$CDEF" >&2
 }
 
@@ -1651,9 +1653,7 @@ cm:csr() {
 }
 #!/bin/bash
 
-##bash-libs: args.sh @ cb35065f (1.4)
-
-##bash-libs: patterns.sh @ cb35065f (1.4)
+##bash-libs: patterns.sh @ bf310b32 (1.4.1)
 
 ### Useful patterns Usage:bbuild
 #
@@ -1677,6 +1677,8 @@ export PAT_num='^[0-9]+$'
 export PAT_cvar='^[a-zA-Z_][a-zA-Z0-9_]*$'
 export PAT_filename='^[a-zA-Z0-9_.-]$'
 export PAT_email="$PAT_filename@$PAT_filename.$PAT_cvar"
+
+##bash-libs: args.sh @ bf310b32 (1.4.1)
 
 ### args Usage:bbuild
 #
@@ -1823,16 +1825,20 @@ args:after() {
 #
 # If not enough argument values are found, the first named variable that failed to be assigned is printed as error
 #
+# ARGNAMES prefixed with '?' do not trigger an error
+#
 # Example:
 #
 #   #%include out.sh
 #   #%include args.sh
 #
 #   get_parameters() {
-#       . <(args:use INFILE OUTFILE -- "$@")
+#       . <(args:use INFILE OUTFILE ?comment -- "$@")
 #
 #       [[ -f "$INFILE" ]]  || out:fail "Input file '$INFILE' does not exist"
 #       [[ -f "$OUTFILE" ]] || out:fail "Output file '$OUTFILE' does not exist"
+#
+#       [[ -z "$comment" ]] || echo "Note: $comment"
 #   }
 #
 #   main() {
