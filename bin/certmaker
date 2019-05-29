@@ -251,17 +251,159 @@ ENDOFEXTENDEDGUIDE
 #
 ###/doc
 
-##bash-libs: tty.sh @ bf310b32 (1.4.1)
 
-tty:is_ssh() {
-    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
+##bash-libs: syntax-extensions.sh @ 27f043bc (2.1.15)
+
+### Syntax Extensions Usage:syntax
+#
+# Syntax extensions for bash-builder.
+#
+# You will need to import this library if you use Bash Builder's extended syntax macros.
+#
+# You should not however use the functions directly, but the extended syntax instead.
+#
+##/doc
+
+### syntax-extensions:use FUNCNAME ARGNAMES ... Usage:syntax
+#
+# Consume arguments into named global variables.
+#
+# If not enough argument values are found, the first named variable that failed to be assigned is printed as error
+#
+# ARGNAMES prefixed with '?' do not trigger an error
+#
+# Example:
+#
+#   #%include std/out.sh
+#   #%include std/syntax-extensions.sh
+#
+#   get_parameters() {
+#       . <(syntax-extensions:use get_parameters INFILE OUTFILE ?comment -- "$@")
+#
+#       [[ -f "$INFILE" ]]  || out:fail "Input file '$INFILE' does not exist"
+#       [[ -f "$OUTFILE" ]] || out:fail "Output file '$OUTFILE' does not exist"
+#
+#       [[ -z "$comment" ]] || echo "Note: $comment"
+#   }
+#
+#   main() {
+#       get_parameters "$@"
+#
+#       echo "$INFILE will be converted to $OUTFILE"
+#   }
+#
+#   main "$@"
+#
+###/doc
+syntax-extensions:use() {
+    local argname arglist undef_f dec_scope argidx argone failmsg pos_ok
+    
+    dec_scope=""
+    [[ "${SYNTAXLIB_scope:-}" = local ]] || dec_scope=g
+    arglist=(:)
+    argone=\"\${1:-}\"
+    pos_ok=true
+    
+    for argname in "$@"; do
+        [[ "$argname" != -- ]] || break
+        [[ "$argname" =~ ^(\?|\*)?[0-9a-zA-Z_]+$ ]] || out:fail "Internal: Not a valid argument name '$argname'"
+
+        arglist+=("$argname")
+    done
+
+    argidx=1
+    while [[ "$argidx" -lt "${#arglist[@]}" ]]; do
+        argname="${arglist[$argidx]}"
+        failmsg="\"Internal: could not get '$argname' in function arguments\""
+        posfailmsg="\"Internal: positional argument '$argname' encountered after optional argument(s)\""
+
+        if [[ "$argname" =~ ^\? ]]; then
+            echo "$SYNTAXLIB_scope ${argname:1}"
+            echo "${argname:1}=$argone; shift || :"
+            pos_ok=false
+
+        elif [[ "$argname" =~ ^\* ]]; then
+            if [[ "$pos_ok" = true ]]; then
+                echo "[[ '${argname:1}' != \"$argone\" ]] || out:fail \"Internal: Local name [${argname:1}] is the same is the name it tries to reference. Rename [$argname] (suggestion: [*p_${argname:1}])\""
+                echo "declare -n${dec_scope} ${argname:1}=$argone; shift || out:fail $failmsg"
+            else
+                echo "out:fail $posfailmsg"
+            fi
+
+        else
+            if [[ "$pos_ok" = true ]]; then
+                echo "$SYNTAXLIB_scope ${argname}"
+                echo "${argname}=$argone; shift || out:fail $failmsg"
+            else
+                echo "out:fail $posfailmsg"
+            fi
+        fi
+
+        argidx=$((argidx + 1))
+    done
 }
 
+
+### syntax-extensions:use:local FUNCNAME ARGNAMES ... Usage:syntax
+# 
+# Enables syntax macro: function signatures
+#   e.g. $%function func(var1 var2) { ... }
+#
+# Build with bbuild to leverage this function's use:
+#
+#   #%include out.sh
+#   #%include syntax-extensions.sh
+#
+#   $%function person(name email) {
+#       echo "$name <$email>"
+#
+#       # $1 and $2 have been consumed into $name and $email
+#       # The rest remains available in $* :
+#       
+#       echo "Additional notes: $*"
+#   }
+#
+#   person "Jo Smith" "jsmith@example.com" Some details
+#
+###/doc
+syntax-extensions:use:local() {
+    SYNTAXLIB_scope=local syntax-extensions:use "$@"
+}
+
+args:use:local() {
+    syntax-extensions:use:local "$@"
+}
+##bash-libs: tty.sh @ 27f043bc (2.1.15)
+
+### tty.sh Usage:bbuild
+# Get information on the current terminal session.
+###/doc
+
+### tty:is_ssh Usage:bbuild
+# Determine whether the TTY is an SSH session.
+#
+# WARNING: this only works for an SSH connection still in the "landing" account.
+# If the user is switched via 'su' or 'sudo', the environment is lost and the variables used to determine this are blank - by default, indicating being not in an SSH session.
+###/doc
+tty:is_ssh() {
+    [[ -n "${SSH_TTY:-}" ]] || [[ -n "${SSH_CLIENT:-}" ]] || [[ "${SSH_CONNECTION:-}" ]]
+}
+
+### tty:is_pipe Usage:bbuild
+# Determine if we are running in a pipe.
+###/doc
 tty:is_pipe() {
     [[ ! -t 1 ]]
 }
 
-##bash-libs: colours.sh @ bf310b32 (1.4.1)
+### tty:is_multiplexer Usage:bbuild
+# Determine if we are in a terminal multiplexer (detects 'screen' and 'tmux')
+###/doc
+tty:is_multiplexer() {
+    [[ -n "${TMUX:-}" ]] || [[ "${TERM:-}" = screen ]]
+}
+
+##bash-libs: colours.sh @ 27f043bc (2.1.15)
 
 ### Colours for terminal Usage:bbuild
 # A series of shorthand colour flags for use in outputs, and functions to set your own flags.
@@ -346,7 +488,21 @@ colours:set() {
     if [[ "$COLOURS_ON" = false ]]; then
         return 0
     else
-        echo -e "\033[${1}m"
+        echo -en "\033[${1}m"
+    fi
+}
+
+### colours:pipe CODE Usage:bbuild
+#
+# Prints a colourisation byte sequence using the provided number, then writes the pipe stream, and then writes a reset sequence (default is '0' to reset colours).
+#
+###/doc
+colours:pipe() {
+    . <(args:use:local colourint ?reset -- "$@") ; 
+    if [[ "$COLOURS_ON" = true ]]; then
+        colours:set "$colourint"
+        cat -
+        colours:set "${reset:-0}"
     fi
 }
 
@@ -414,7 +570,7 @@ colours:auto() {
 
 colours:auto
 
-##bash-libs: out.sh @ bf310b32 (1.4.1)
+##bash-libs: out.sh @ 27f043bc (2.1.15)
 
 ### Console output handlers Usage:bbuild
 #
@@ -501,8 +657,79 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
+##bash-libs: patterns.sh @ 27f043bc (2.1.15)
 
-##bash-libs: autohelp.sh @ bf310b32 (1.4.1)
+### Useful patterns Usage:bbuild
+#
+# Some useful regex patterns, exported as environment variables.
+#
+# They are not foolproof, and you are encouraged to improve upon them.
+#
+# $PAT_blank - detects whether an entire line is empty or whitespace
+# $PAT_comment - detects whether is a line is a script comment (assumes '#' as the comment marker)
+# $PAT_num - detects whether the string is an integer number in its entirety
+# $PAT_cvar - detects if the string is a valid C variable name
+# $PAT_filename - detects if the string is a safe UNIX or Windows file name;
+#   does not allow presence of special characters aside from '_', '.', and '-'
+# $PAT_email - simple heuristic to determine whether a string looks like a valid email address
+#
+###/doc
+
+export PAT_blank='^\s*$'
+export PAT_comment='^\s*(#.*)?$'
+export PAT_num='^[0-9]+$'
+export PAT_cvar='^[a-zA-Z_][a-zA-Z0-9_]*$'
+export PAT_filename='^[a-zA-Z0-9_. -]+$'
+export PAT_email="[a-zA-Z0-9_.+-]+@[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-z]+"
+
+### Formatting library Usage:bbuild
+#
+# Some convenience functions for formatting output.
+#
+###/doc
+
+### format:columns [SEP] Usage:bbuild
+#
+# Redirect input or pipe into this function to print columns using separator
+#  (default is tab character).
+#
+# Each line is split along the separator characters (each individual character is a
+#  separator, and the column widths are adjusted to the widest member of all rows.
+#
+# e.g.
+#
+#    format:columns ':' < /etc/passwd
+#
+#    grep January report.tsv | format:column
+#
+###/doc
+
+format:columns() {
+    . <(args:use:local ?sep -- "$@") ; 
+    [[ -n "$sep" ]] || sep=$'\t'
+
+    column -t -s "$sep"
+}
+
+### format:wrap Usage:bbuild
+#
+# Pipe or redirect into this function to soft-wrap text along spaces to terminal
+#  width, or specified width.
+#
+# e.g.
+#
+#   format:wrap 40 < README.md
+#
+###/doc
+
+format:wrap() {
+    . <(args:use:local ?cols -- "$@") ; 
+    [[ -n "$cols" ]] || cols="$(tput cols)"
+    [[ "$cols" =~ $PAT_num ]] || return 1
+    fold -w "$cols" -s
+}
+
+##bash-libs: autohelp.sh @ 27f043bc (2.1.15)
 
 ### Autohelp Usage:bbuild
 #
@@ -556,7 +783,7 @@ function out:error {
 #
 # Example usage in a multi-function script:
 #
-#   #!/bin/bash
+#   #!usr/bin/env bash
 #
 #   ### Main help Usage:help
 #   # The main help
@@ -567,7 +794,7 @@ function out:error {
 #   ###/doc
 #
 #   feature1() {
-#       autohelp:check_section feature_1 "$@"
+#       autohelp:check:section feature_1 "$@"
 #       echo "Feature I"
 #   }
 #
@@ -576,26 +803,17 @@ function out:error {
 #   ###/doc
 #
 #   feature2() {
-#       autohelp:check_section feature_2 "$@"
+#       autohelp:check:section feature_2 "$@"
 #       echo "Feature II"
 #   }
 #
 #   main() {
-#       if [[ -z "$*" ]]; then
-#           ### No command specified Usage:no-command
-#           #No command specified. Try running with `--help`
-#           ###/doc
-#
-#           autohelp:print no-command
-#           exit 1
-#       fi
-#
 #       case "$1" in
 #       feature1|feature2)
 #           "$1" "$@"            # Pass the global script arguments through
 #           ;;
 #       *)
-#           autohelp:check "$@"  # Check if main help was asked for, if so, exits
+#           autohelp:check-no-null "$@"  # Check if main help was asked for, if so, or if no args, exit with help
 #
 #           # Main help not requested, return error
 #           echo "Unknown feature"
@@ -618,13 +836,11 @@ function out:error {
 HELPCHAR='#'
 
 autohelp:print() {
+    . <(args:use:local ?section_string ?target_file -- "$@") ; 
     local input_line
-    local section_string="${1:-}"; shift || :
-    local target_file="${1:-}"; shift || :
     [[ -n "$section_string" ]] || section_string=help
     [[ -n "$target_file" ]] || target_file="$0"
 
-    #echo -e "\n$(basename "$target_file")\n===\n"
     local sec_start='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$section_string"'\s*$'
     local sec_end='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s*/doc\s*$'
     local in_section=false
@@ -658,32 +874,147 @@ autohelp:paged() {
     autohelp:print "$@" | $PAGER
 }
 
+### autohelp:check-or-null ARGS ... Usage:bbuild
+# Print help if arguments are empty, or if arguments contain a '--help' token
+#
+###/doc
+autohelp:check-or-null() {
+    if [[ -z "$*" ]]; then
+        autohelp:print help "$0"
+        exit 0
+    else
+        autohelp:check:section "help" "$@"
+    fi
+}
+
+### autohelp:check-or-null:section SECTION ARGS ... Usage:bbuild
+# Print help section SECTION if arguments are empty, or if arguments contain a '--help' token
+#
+###/doc
+autohelp:check-or-null:section() {
+    . <(args:use:local section -- "$@") ; 
+    if [[ -z "$*" ]]; then
+        autohelp:print "$section" "$0"
+        exit 0
+    else
+        autohelp:check:section "$section" "$@"
+    fi
+}
+
 ### autohelp:check ARGS ... Usage:bbuild
 #
 # Automatically print "help" sections and exit, if "--help" is detected in arguments
 #
 ###/doc
 autohelp:check() {
-    autohelp:check_section "help" "$@"
+    autohelp:check:section "help" "$@"
 }
 
-### autohelp:check_section SECTION ARGS ... Usage:bbuild
+### autohelp:check:section SECTION ARGS ... Usage:bbuild
 # Automatically print documentation for named section and exit, if "--help" is detected in arguments
 #
 ###/doc
-autohelp:check_section() {
+autohelp:check:section() {
     local section arg
     section="${1:-}"; shift || out:fail "No help section specified"
 
     for arg in "$@"; do
         if [[ "$arg" =~ --help ]]; then
-            cols="$(tput cols)"
-            autohelp:print "$section" | fold -w "$cols" -s || autohelp:print "$section"
+            autohelp:print "$section" | format:wrap
             exit 0
         fi
     done
 }
-##bash-libs: runmain.sh @ bf310b32 (1.4.1)
+##bash-libs: abspath.sh @ 27f043bc (2.1.15)
+
+### abspath:path RELATIVEPATH [ MAX ] Usage:bbuild
+# Returns the absolute path of a file/directory
+#
+# MAX defines the maximum number of "../" relative items to process
+#   default is 50
+###/doc
+
+function abspath:path {
+    local workpath="$1" ; shift || :
+    local max="${1:-50}" ; shift || :
+
+    if [[ "${workpath:0:1}" != "/" ]]; then workpath="$PWD/$workpath"; fi
+
+    workpath="$(abspath:collapse "$workpath")"
+    abspath:resolve_dotdot "$workpath" "$max" | sed -r 's|(.)/$|\1|'
+}
+
+function abspath:collapse {
+    echo "$1" | sed -r 's|/\./|/|g ; s|/\.$|| ; s|/+|/|g'
+}
+
+function abspath:resolve_dotdot {
+    local workpath="$1"; shift || :
+    local max="$1"; shift || :
+
+    # Set a limit on how many iterations to perform
+    # Only very obnoxious paths should fail
+    local obnoxious_counter
+    for obnoxious_counter in $(seq 1 $max); do
+        # No more dot-dots - good to go
+        if [[ ! "$workpath" =~ /\.\.(/|$) ]]; then
+            echo "$workpath"
+            return 0
+        fi
+
+        # Starts with an up-one at root - unresolvable
+        if [[ "$workpath" =~ ^/\.\.(/|$) ]]; then
+            return 1
+        fi
+
+        workpath="$(echo "$workpath"|sed -r 's@[^/]+/\.\.(/|$)@@')"
+    done
+
+    # A very obnoxious path was used.
+    return 2
+}
+
+##bash-libs: this.sh @ 27f043bc (2.1.15)
+
+### this: Info about the current command Usage:bbuild
+#
+# Get information about the current running app.
+#
+# Additional to the documented functions, there are three environment variables:
+#
+# * `THIS_basename` : the plain name of the currently running script
+# * `THIS_dirname` : the absolute path to the script's containing directory
+# * `THIS_scriptpath` : the absolute path to the script
+#
+###/doc
+
+### this:bin Usage:bbuild
+# The file name of the running script, without its path
+###/doc
+function this:bin {
+    if [[ -n "${BBRUN_SCRIPT:-}" ]]; then
+        basename "$BBRUN_SCRIPT"
+    else
+        basename "$0"
+    fi
+}
+
+### this:bindir Usage:bbuild
+# The absolute path of the directory in which the command is running
+###/doc
+function this:bindir {
+    if [[ -n "${BBRUN_SCRIPT:-}" ]]; then
+        dirname "$BBRUN_SCRIPT"
+    else
+        abspath:path "$(dirname "$0")"
+    fi
+}
+
+THIS_basename="$(this:bin)"
+THIS_dirname="$(this:bindir)"
+THIS_scriptpath="$THIS_dirname/$THIS_basename"
+
+##bash-libs: runmain.sh @ 27f043bc (2.1.15)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -691,7 +1022,7 @@ autohelp:check_section() {
 # name of the script matches SCRIPTNAME
 #
 # This allows you include a main-like function in your library
-# that only runs if you use your lib as an executabl itself.
+# that only runs if you use your lib as an executable itself.
 #
 # For example, an image archiver could be:
 #
@@ -712,7 +1043,7 @@ autohelp:check_section() {
 function runmain {
     local required_name="$1"; shift || :
     local funcall="$1"; shift || :
-    local scriptname="$(basename "$0")"
+    local scriptname="$THIS_basename"
 
     if [[ "$required_name" = "$scriptname" ]]; then
         "$funcall" "$@"
@@ -822,7 +1153,7 @@ cert-getter:main() {
 
 runmain cert-getter.sh cert-getter:main "$@"
 
-##bash-libs: safe.sh @ bf310b32 (1.4.1)
+##bash-libs: safe.sh @ 27f043bc (2.1.15)
 
 ### Safe mode Usage:bbuild
 #
@@ -831,24 +1162,25 @@ runmain cert-getter.sh cert-getter:main "$@"
 # * Script bails if a statement or command returns non-zero status
 #   * except when in a conditional statement
 # * Accessing a variable that is not set is an error, causing non-zero status of the operation
-# * If a file glob does not expand, cause an error condition
+# * Prevents globs
 # * If a component of a pipe fails, the entire pipe statement returns non-zero
 #
 # Splitting over spaces
+# ---------------------
 #
-# You can also switch space splitting on or off (normal bash default is 'on')
+# By default, array assignments and `read` command split over any whitespace.
 #
-# Given a function `foo()` that returns multiple lines, which may each have spaces in them, use safe splitting to return each item into an array as its own item, without splitting over spaces.
+# You can deactivate space splitting using `safe:space-split off`
+# and reactivate it using `safe:space-split on`
 #
-#   safe:space-split off
-#   mylist=(foo)
-#   safe:space-split on
+# Globs
+# -------
 #
-# Having space splitting on causes statements like `echo "$*"` to print each argument on its own line.
+# In safe mode, glob expansion like `ls .config/*` is turned off by default.
+#
+# You can turn glob expansion on with `safe:glob on`, and off with `safe:glob off`
 #
 ###/doc
-
-set -eufo pipefail
 
 safe:space-split() {
     case "$1" in
@@ -864,9 +1196,25 @@ safe:space-split() {
     esac
 }
 
-##bash-libs: searchpaths.sh @ bf310b32 (1.4.1)
+safe:glob() {
+    case "$1" in
+    off)
+        set -f
+        ;;
+    on)
+        set +f
+        ;;
+    *)
+        out:fail "API error: bad use of safe:glob - must be 'on' or 'off' not '$1'"
+        ;;
+    esac
+}
 
-# FIXME - set function signature in head of help
+set -eufo pipefail
+
+
+##bash-libs: searchpaths.sh @ 27f043bc (2.1.15)
+
 ### searchpaths:file_from PATHDEF FILE Usage:bbuild
 #
 # Locate a file along a search path.
@@ -890,16 +1238,22 @@ function searchpaths:file_from {
     local PATHS="$1"; shift || :
     local FILE="$1"; shift || :
 
-    for path in $(echo "$PATHS"|tr ':' ' '); do
+    local oldIFS="$IFS"
+    IFS=$' \t\n'
+
+    for path in $(echo "$PATHS"|tr ':' ' '); do # FIXME use string splitter
         local fpath="$path/$FILE"
         if [[ -f "$fpath" ]]; then
             echo "$fpath"
             return 0
         fi
     done
+
+    IFS="$oldIFS"
     return 1
 }
-##bash-libs: vars.sh @ bf310b32 (1.4.1)
+
+##bash-libs: vars.sh @ 27f043bc (2.1.15)
 
 ### Vars library Usage:bbuild
 #
@@ -907,36 +1261,61 @@ function searchpaths:file_from {
 #
 ###/doc
 
-### vars:require RETURNVAR VARNAMES ... Usage:bbuild
+readonly VARS_ERR_not_set=10
+
+### vars:are-set VARNAMES ... Usage:bbuild
 #
 # Check a list of environment variables such that none are non-empty.
 #
-# If variables are empty/not set, the name is added to the return holder variable.
+# If not all variables are set, returns value $VARS_ERR_not_set
 #
 # Example:
 #
-#    myvarA=one
-#    myvarB=
-#    myvarC=three
-#
-#    if ! vars:require missing_vars myvarA myvarB myvarC ; then
-#        echo "The following variables are not set: $missing_vars"
+#    if vars:are-set myvarA myvarB; then
+#        echo "proceeding"
 #    fi
 #
 ###/doc
 
+vars:are-set() {
+    . <(args:use:local  -- "$@") ; 
+    local _null
+    vars:require _null "$@"
+}
+
+### vars:require RETURNVAR VARNAMES ... Usage:bbuild
+#
+# Check a list of environment variables such that none are non-empty.
+#
+# If variables are empty/not set, the name is added to the return holder variable, and returns value $VARS_ERR_not_set
+#
+# Example:
+#
+#   local missing_vars
+#   if ! vars:require missing_vars myvarA myvarB myvarC ; then
+#       echo "The following variables are not set: $missing_vars"
+#   fi
+#
+###/doc
+
 vars:require() {
-    local missing_var="${1:-}" ; shift || out:fail "Internal error: no aruments passed for var check"
-    local res=0
+    . <(args:use:local *p_returnarr -- "$@") ; 
+    local varname res
+    res=0
 
     for varname in "$@"; do
-        . <(echo "[[ -n \"\${$varname:-}\" ]]") || {
-            . <(echo "$missing_var=\"\${$missing_var:-} $varname\"")
-            res=1
-        }
+        if ! vars:_has_value "$varname"; then
+            p_returnarr+=("$varname")
+            res="$VARS_ERR_not_set"
+        fi
     done
 
     return "$res"
+}
+
+vars:_has_value() {
+    . <(args:use:local *_p_varname -- "$@") ; 
+    [[ -n "${_p_varname:-}" ]]
 }
 
 CERTMAKER_confpaths=".:$HOME/.config/certmaker:/etc/certmaker"
@@ -954,6 +1333,7 @@ cm:config:load_config() {
 cm:config:get_temp() {
     echo "$cnftemplates/$1.cnf"
 }
+
 
 ### certmaker template {ca|host} [OUTFILE] Usage:template
 #
@@ -982,7 +1362,7 @@ cm:template() {
         ;;
     esac
 }
-##bash-libs: bincheck.sh @ bf310b32 (1.4.1)
+##bash-libs: bincheck.sh @ 27f043bc (2.1.15)
 
 ### bincheck:get COMMANDS ... Usage:bbuild
 #
@@ -1117,7 +1497,7 @@ cm:ca:new-ca() {
 	out:info "You can store the certificate password in [$castore/pass.txt] for automatic signing"
 }
 
-##bash-libs: askuser.sh @ bf310b32 (1.4.1)
+##bash-libs: askuser.sh @ 27f043bc (2.1.15)
 
 ### askuser Usage:bbuild
 # Present the user with questions on stderr
@@ -1243,6 +1623,17 @@ function askuser:choose {
     done
 }
 
+
+
+files:ensure_file() {
+	local target="$1"; shift
+	local tdir="$(dirname "$target")"
+
+	[[ -d "$tdir" ]] || mkdir -p "$tdir"
+
+	[[ -f "$target" ]] || echo -n "$*" > "$target"
+}
+
 ### CSR Signing Usage:sign
 #
 # Sign a known host or csr
@@ -1307,16 +1698,6 @@ cm:sign:overwrite_check() {
 	askuser:confirm "${CYEL}Overwrite '$certfile'?$CDEF" || out:fail "Abort."
 
 	rm "$certfile" || out:fail "Could not remove '$certfile'"
-}
-
-
-files:ensure_file() {
-	local target="$1"; shift
-	local tdir="$(dirname "$target")"
-
-	[[ -d "$tdir" ]] || mkdir -p "$tdir"
-
-	[[ -f "$target" ]] || echo -n "$*" > "$target"
 }
 
 ### New registered host Usage:new-host
@@ -1627,6 +2008,7 @@ cm:edit:host() {
     cm:util:edit "$myhostd/$myhost.cnf"
 }
 
+
 ### certmaker csr NAME [FQDN ...] Usage:makecsr
 # 
 # Create a new CSR, generating a config and key file if necessary
@@ -1651,40 +2033,101 @@ cm:csr() {
 	
 	cm:renew csr "$name.key" "$name.cnf" "$name.csr"
 }
-#!/bin/bash
+#!/usr/bin/env bash
 
-##bash-libs: patterns.sh @ bf310b32 (1.4.1)
 
-### Useful patterns Usage:bbuild
+##bash-libs: strings.sh @ 27f043bc (2.1.15)
+
+### Strings library Usage:bbuild
 #
-# Some useful regex patterns, exported as environment variables.
-#
-# They are not foolproof, and you are encouraged to improve upon them.
-#
-# $PAT_blank - detects whether an entire line is empty or whitespace
-# $PAT_comment - detects whether is a line is a script comment (assumes '#' as the comment marker)
-# $PAT_num - detects whether the string is an integer number in its entirety
-# $PAT_cvar - detects if the string is a valid C variable name
-# $PAT_filename - detects if the string is a safe UNIX or Windows file name;
-#   does not allow presence of whitespace or special characters aside from '_', '.', '-'
-# $PAT_email - simple heuristic to determine whether a string looks like a valid email address
+# More advanced string manipulation functions.
 #
 ###/doc
 
-export PAT_blank='^\s*$'
-export PAT_comment='^\s*(#.*)?$'
-export PAT_num='^[0-9]+$'
-export PAT_cvar='^[a-zA-Z_][a-zA-Z0-9_]*$'
-export PAT_filename='^[a-zA-Z0-9_.-]$'
-export PAT_email="$PAT_filename@$PAT_filename.$PAT_cvar"
+### strings:join JOINER STRINGS ... Usage:bbuild
+#
+# Join multiple strings, separated by the JOINER string
+#
+# Write the joined string to stdout
+#
+###/doc
 
-##bash-libs: args.sh @ bf310b32 (1.4.1)
+strings:join() {
+    # joiner can be any string
+    local joiner="$1"; shift || :
+
+    # so we use an array to collect the token parts
+    local destring=(:)
+
+    for token in "$@"; do
+        destring[${#destring[@]}]="$joiner"
+        destring[${#destring[@]}]="$token"
+    done
+
+    local finalstring=""
+    # first remove holder token and initial join token
+    #   before iterating
+    for item in "${destring[@]:2}"; do
+        finalstring="${finalstring}${item}"
+    done
+    echo "$finalstring"
+}
+
+### strings:split *RETURN_ARRAY SPLITTER STRING Usage:bbuild
+#
+# Split a STRING along each instance of SPLITTER
+#
+# Write the result to the variable in RETURN_ARRAY (pass as name reference)
+#
+# e.g.
+#
+#   local my_array
+#
+#   strings:split my_array ":" "a:b c:d"
+#
+#   echo "${my_array[1]}" # --> "b c"
+#
+###/doc
+
+strings:split() {
+    . <(args:use:local *p_returnarray splitter string_to_split -- "$@") ; 
+    local items=(:)
+
+    while [[ -n "$string_to_split" ]]; do
+        if [[ ! "$string_to_split" =~ "${splitter}" ]]; then
+            items[${#items[@]}]="$string_to_split"
+            break
+        fi
+
+        local token="$(echo "$string_to_split"|sed -r "s${splitter}.*$")"
+        items+=("$token")
+        string_to_split="$(echo "$string_to_split"|sed "s^${token}${splitter}")"
+    done
+
+    p_returnarray=("${items[@]:1}")
+}
+
+##bash-libs: args.sh @ 27f043bc (2.1.15)
 
 ### args Usage:bbuild
 #
 # An arguments handling utility.
 #
+# `args:has` can be used to determine if an exact token exists in the array of arguments
+#
+# `args:get` can be used to extract individual arguments from an array of arguments; it assumes any flag is to be followed by the actual sought token.
+# It follows the convention that short flags are followed by value token ("-s value", "-l value")
+#   but that long flags incorporate their value after an equals sign ("--short=value", "--long=value")
+#
+# `args:parse` provides a fuller argument parsing utility, detecting some basic types, and optionally alerting to when a an argument was not expected.
+# It assumes that both short and long flags are followed separately by their value token ("-s value", "--long value")
+#
 ###/doc
+
+readonly ARGS_ERR_NaN=100
+readonly ARGS_ERR_unknown_flag=101
+readonly ARGS_ERR_missing_value=102
+readonly ARGS_ERR_unknown_token=103
 
 ### args:get TOKEN ARGS ... Usage:bbuild
 #
@@ -1723,17 +2166,17 @@ args:get() {
         echo "${arguments[$n]}"
 
     elif [[ "$seek" =~ ^--.+ ]]; then
-        args:get_long "$seek" "$@"
+        args:_get_long "$seek" "$@"
 
     elif [[ "$seek" =~ ^-[a-zA-Z0-9]$ ]]; then
-        args:get_short "$seek" "$@"
+        args:_get_short "$seek" "$@"
 
     else
         return 1
     fi
 }
 
-args:get_short() {
+args:_get_short() {
     local token="$1"; shift || :
     while [[ -n "$*" ]]; do
         local item="$1"; shift || :
@@ -1746,7 +2189,7 @@ args:get_short() {
     return 1
 }
 
-args:get_long() {
+args:_get_long() {
     local token="$1"; shift || :
     local tokenpat="^$token=(.*)$"
 
@@ -1789,118 +2232,168 @@ args:has() {
     return 1
 }
 
-### args:after TOKEN ARGS ... Usage:bbuild
+### args:quote ARGS ... Usage:bbuild
 #
-# Return all tokens after TOKEN via the RETARR_ARGSAFTER
-#
-#    myargs=(one two -- three "four and" five)
-# 	args:after -- "${myargs[@]}"
-#
-# 	for a in "${RETARR_ARGSAFTER}"; do
-# 		echo "$a"
-# 	done
-#
-# The above prints
-#
-# 	three
-# 	four and
-# 	five
+# Produce a single string with each argument. If the argument has whitespace, double-quotes are added. If the argument has double-quotes as part of its data, these are escaped.
 #
 ###/doc
+args:quote() {
+    local argstring arg
+    argstring=""
 
-args:after() {
-    local token="$1"; shift || :
-    
-    local current_token="$1"; shift || :
-    while [[ "$#" -gt 0 ]] && [[ "$current_token" != "$token" ]]; do
-        current_token="$1"; shift || :
-    done
+    for arg in "$@"; do
+        arg="$(echo -n "$arg" | sed -rz 's/"/\\"/g ; s/\n/\\n/g ; s/\r/\\r/g ; s/\t/\\t/g')"
 
-    RETARR_ARGSAFTER=("$@")
-}
-
-### args:use ARGNAMES ... -- ARGVALUES ... Usage:bbuild
-# 
-# Consume arguments into named global variables.
-#
-# If not enough argument values are found, the first named variable that failed to be assigned is printed as error
-#
-# ARGNAMES prefixed with '?' do not trigger an error
-#
-# Example:
-#
-#   #%include out.sh
-#   #%include args.sh
-#
-#   get_parameters() {
-#       . <(args:use INFILE OUTFILE ?comment -- "$@")
-#
-#       [[ -f "$INFILE" ]]  || out:fail "Input file '$INFILE' does not exist"
-#       [[ -f "$OUTFILE" ]] || out:fail "Output file '$OUTFILE' does not exist"
-#
-#       [[ -z "$comment" ]] || echo "Note: $comment"
-#   }
-#
-#   main() {
-#       get_parameters "$@"
-#
-#       echo "$INFILE will be converted to $OUTFILE"
-#   }
-#
-#   main "$@"
-#
-###/doc
-args:use() {
-    local argname arglist undef_f
-    arglist=(:)
-    for argname in "$@"; do
-        [[ "$argname" != -- ]] || break
-        [[ "$argname" =~ ^\??[0-9a-zA-Z_]+$ ]] || out:fail "Internal: Not a valid argument name '$argname'"
-
-        arglist+=("$argname")
-    done
-
-    for argname in "${arglist[@]:1}"; do
-        if [[ "$argname" =~ ^\? ]]; then
-            argname="${argname:1}"
-            undef_f=":"
-        else
-            undef_f="out:fail \"Internal : could not get '$argname'\""
+        if (echo "$arg" | grep -Pq '\s') || [[ -z "$arg" ]]; then
+            arg="\"${arg}\""
         fi
 
-        echo "$ARGSLIB_scope $argname=\"\${1:-}\"; shift || $undef_f"
+        argstring="$argstring $arg"
     done
+
+    echo "${argstring:1}"
 }
 
-
-### args:use:local ARGNAMES ... -- ARGVALUES ... Usage:bbuild
-# 
-# Consume arguments into named variables. You need to use process subtitution and sourcing
-#   to call the function, so that it affects the scope in your function.
+### args:parse *ARGSDEF *FLAGLESS ARGS ... Usage:bbuild
 #
-# If not enough argument values are found, the named variable that failed to be assigned is printed as error
+# Iterate over the supplied arguments, using an array of argument/variables definitions.
 #
-# Example:
+# ARGSDEF :
 #
-#   #%include out.sh
-#   #%include args.sh
+# This is an array of flag definitions. Each definition token comprises of three parts, separated by a colon ':':
 #
-#   person() {
-#       . <(args:use:local name email -- "$@")
+# * type
+# * return name
+# * flags
 #
-#       echo "$name <$email>"
+# The return name is the literal name of a variable to return values to (by name reference)
 #
-#       # $1 and $2 have been consumed into $name and $email
-#       # The rest remains available in $* :
-#       
-#       echo "Additional notes: $*"
+# There are three defined types:
+#
+# * 'b' - the name reference is set to the string "true" if a relevant flag is found
+# * 's' - the name reference is set to the value of the string passed
+# * 'n' - the name reference is set to a numerical string if found
+#
+# Flags is a comma-separated list of flags that trigger a match.
+#
+# For 's' and 'n' parameters, it is always expected that the following token provide the value.
+# NOTE: this is different from args:get behaviour.
+#
+# FLAGLESS :
+#
+# The name of the variable into which to put the tokens that were found, but not attached to flags.
+# If the name "-" is passed, causes an error when a flagless token is found.
+#
+# For example:
+#
+#   #%include std/args.sh
+#
+#   docopy() {
+#       # Define locally to not cause args:parse to write global variables
+#       local args_def usebinary infile outfile bytes
+#
+#       args_def=(
+#           "b:usebinary:-b,--binary"
+#           "s:infile:-i,--input"
+#           "s:outfile:-o,--output"
+#           "n:bytes:-n"
+#       )
+#
+#       # Pass 'args_def' by name reference
+#       args:parse args_def - "$@"
+#
+#       echo "Copying from $infile to $outfile"
+#       if [[ "$usebinary" = true ]]; then
+#           echo "Using binary mode"
+#       fi
+#       if [[ -n "${bytes:-}" ]]; then
+#           echo "Limiting to $bytes bytes."
+#       fi
 #   }
 #
-#   person "Jo Smith" "jsmith@exam0ple.com" Some details
+#   # Prints text
+#   docopy --input infile.txt -o outfile.bin -b -n 5
+#
+#   # Fails (unknown flag '-x')
+#   docopy --input infile.txt -o outfile.bin -b -x
+#
+#
+#
+# UNKNOWN FLAGS
+#
+# By default, if args:parse finds a flag that was not declared, it will cause a filure exit. You can set an environment variable `ARGS_allow_unknown_flags=true` to bypass this.
 #
 ###/doc
-args:use:local() {
-    ARGSLIB_scope=local args:use "$@"
+args:parse() {
+    . <(args:use:local *a_argsdefs ?flagless_returnname -- "$@") ; 
+    local arg __argdef __type __name __flags __flagless
+
+    if [[ "$flagless_returnname" != "-" ]]; then
+        __flagless=(:)
+        declare -n p_flaglessreturn="$flagless_returnname"
+    fi
+
+    while [[ -n "$*" ]]; do
+        arg="$1"; shift
+
+        if [[ "$arg" =~ ^- ]]; then
+            if ! args:_get_argdef "$arg" "__argdef" "a_argsdefs" && [[ "${ARGS_allow_unknown_flags:-}" = true ]]; then
+                out:fail $ARGS_ERR_unknown_flag "Unknown flag '$arg'"
+            fi
+
+            args:_unpack_argdef __type __name __flags "$__argdef"
+
+            declare -n p_pointedvar="$__name"
+
+            if [[ "$__type" = b ]]; then
+                p_pointedvar=true
+            else
+                p_pointedvar="${1:-}"; shift || out:fail $ARGS_ERR_missing_value "Argument parse error - expected value for '$__name' (flag was '$arg')"
+            fi
+
+            if [[ "$__type" = n ]]; then
+                [[ "$p_pointedvar" =~ $PAT_num ]] || out:fail $ARGS_ERR_NaN "Argument parse error - expected number for '$__name' but got '$p_pointedvar'"
+            fi
+
+        elif [[ "$flagless_returnname" != "-" ]]; then
+            __flagless+=("$arg")
+
+        else
+            out:fail $ARGS_ERR_unknown_token "Unrecognized token: '$arg'"
+        fi
+    done
+
+    if [[ "$flagless_returnname" != "-" ]]; then
+        p_flaglessreturn="${__flagless[@]:1}"
+    fi
+}
+
+args:_get_argdef() {
+    . <(args:use:local flag *p_argdef *p_a_argsdefs -- "$@") ; 
+    local argdef_string flags
+
+    for argdef_string in "${p_a_argsdefs[@]}"; do
+        flags="${argdef_string##*:}"
+        if [[ "$flags" =~ (^|,)$flag(,|$) ]]; then
+            p_argdef="$argdef_string"
+            return 0
+        fi
+    done
+    return 1
+}
+
+args:_unpack_argdef() {
+    . <(args:use:local *p_type *p_name *p_flags argdef_string -- "$@") ; 
+    local a_argdef
+    strings:split a_argdef : "$argdef_string"
+    
+    p_type="${a_argdef[0]}"
+    p_name="${a_argdef[1]}"
+    p_flags="${a_argdef[2]}"
+
+    if [[ ! "$p_type" =~ ^s|b|n$ ]]; then
+        out:fail "Invalid type '$p_type' for '$p_name'"
+    fi
 }
 
 set -euo pipefail

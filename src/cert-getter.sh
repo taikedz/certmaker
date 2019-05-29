@@ -15,7 +15,9 @@
 #
 ###/doc
 
-#%include out.sh autohelp.sh runmain.sh
+#%include std/out.sh
+#%include std/autohelp.sh
+#%include std/runmain.sh
 
 function argcheck {
     local arg="$1"; shift

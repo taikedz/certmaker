@@ -6,10 +6,26 @@
 # It is provided to you under the terms of the GNU General Public License v3
 # https://www.gnu.org/licenses/gpl-3.0.html
 
-#%include help.sh guide.sh cert-getter.sh
+#%include help.sh
+#%include guide.sh
+#%include cert-getter.sh
 
-#%include safe.sh autohelp.sh out.sh
-#%include ctconf.sh template.sh ca.sh sign.sh files.sh host.sh new.sh renew.sh paths.sh quick.sh edit.sh csr.sh
+#%include std/safe.sh
+#%include std/autohelp.sh
+#%include std/out.sh
+
+#%include ctconf.sh
+#%include template.sh
+#%include ca.sh
+#%include sign.sh
+#%include files.sh
+#%include host.sh
+#%include new.sh
+#%include renew.sh
+#%include paths.sh
+#%include quick.sh
+#%include edit.sh
+#%include csr.sh
 #%include jks-manip.sh
 
 cm:main() {

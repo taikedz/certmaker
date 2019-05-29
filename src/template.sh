@@ -1,4 +1,5 @@
-#%include out.sh
+#%include std/out.sh
+
 #%include ctconf.sh
 
 ### certmaker template {ca|host} [OUTFILE] Usage:template

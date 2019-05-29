@@ -15,17 +15,159 @@
 #
 ###/doc
 
-##bash-libs: tty.sh @ bf310b32 (1.4.1)
 
-tty:is_ssh() {
-    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
+##bash-libs: syntax-extensions.sh @ 27f043bc (2.1.15)
+
+### Syntax Extensions Usage:syntax
+#
+# Syntax extensions for bash-builder.
+#
+# You will need to import this library if you use Bash Builder's extended syntax macros.
+#
+# You should not however use the functions directly, but the extended syntax instead.
+#
+##/doc
+
+### syntax-extensions:use FUNCNAME ARGNAMES ... Usage:syntax
+#
+# Consume arguments into named global variables.
+#
+# If not enough argument values are found, the first named variable that failed to be assigned is printed as error
+#
+# ARGNAMES prefixed with '?' do not trigger an error
+#
+# Example:
+#
+#   #%include std/out.sh
+#   #%include std/syntax-extensions.sh
+#
+#   get_parameters() {
+#       . <(syntax-extensions:use get_parameters INFILE OUTFILE ?comment -- "$@")
+#
+#       [[ -f "$INFILE" ]]  || out:fail "Input file '$INFILE' does not exist"
+#       [[ -f "$OUTFILE" ]] || out:fail "Output file '$OUTFILE' does not exist"
+#
+#       [[ -z "$comment" ]] || echo "Note: $comment"
+#   }
+#
+#   main() {
+#       get_parameters "$@"
+#
+#       echo "$INFILE will be converted to $OUTFILE"
+#   }
+#
+#   main "$@"
+#
+###/doc
+syntax-extensions:use() {
+    local argname arglist undef_f dec_scope argidx argone failmsg pos_ok
+    
+    dec_scope=""
+    [[ "${SYNTAXLIB_scope:-}" = local ]] || dec_scope=g
+    arglist=(:)
+    argone=\"\${1:-}\"
+    pos_ok=true
+    
+    for argname in "$@"; do
+        [[ "$argname" != -- ]] || break
+        [[ "$argname" =~ ^(\?|\*)?[0-9a-zA-Z_]+$ ]] || out:fail "Internal: Not a valid argument name '$argname'"
+
+        arglist+=("$argname")
+    done
+
+    argidx=1
+    while [[ "$argidx" -lt "${#arglist[@]}" ]]; do
+        argname="${arglist[$argidx]}"
+        failmsg="\"Internal: could not get '$argname' in function arguments\""
+        posfailmsg="\"Internal: positional argument '$argname' encountered after optional argument(s)\""
+
+        if [[ "$argname" =~ ^\? ]]; then
+            echo "$SYNTAXLIB_scope ${argname:1}"
+            echo "${argname:1}=$argone; shift || :"
+            pos_ok=false
+
+        elif [[ "$argname" =~ ^\* ]]; then
+            if [[ "$pos_ok" = true ]]; then
+                echo "[[ '${argname:1}' != \"$argone\" ]] || out:fail \"Internal: Local name [${argname:1}] is the same is the name it tries to reference. Rename [$argname] (suggestion: [*p_${argname:1}])\""
+                echo "declare -n${dec_scope} ${argname:1}=$argone; shift || out:fail $failmsg"
+            else
+                echo "out:fail $posfailmsg"
+            fi
+
+        else
+            if [[ "$pos_ok" = true ]]; then
+                echo "$SYNTAXLIB_scope ${argname}"
+                echo "${argname}=$argone; shift || out:fail $failmsg"
+            else
+                echo "out:fail $posfailmsg"
+            fi
+        fi
+
+        argidx=$((argidx + 1))
+    done
 }
 
+
+### syntax-extensions:use:local FUNCNAME ARGNAMES ... Usage:syntax
+# 
+# Enables syntax macro: function signatures
+#   e.g. $%function func(var1 var2) { ... }
+#
+# Build with bbuild to leverage this function's use:
+#
+#   #%include out.sh
+#   #%include syntax-extensions.sh
+#
+#   $%function person(name email) {
+#       echo "$name <$email>"
+#
+#       # $1 and $2 have been consumed into $name and $email
+#       # The rest remains available in $* :
+#       
+#       echo "Additional notes: $*"
+#   }
+#
+#   person "Jo Smith" "jsmith@example.com" Some details
+#
+###/doc
+syntax-extensions:use:local() {
+    SYNTAXLIB_scope=local syntax-extensions:use "$@"
+}
+
+args:use:local() {
+    syntax-extensions:use:local "$@"
+}
+##bash-libs: tty.sh @ 27f043bc (2.1.15)
+
+### tty.sh Usage:bbuild
+# Get information on the current terminal session.
+###/doc
+
+### tty:is_ssh Usage:bbuild
+# Determine whether the TTY is an SSH session.
+#
+# WARNING: this only works for an SSH connection still in the "landing" account.
+# If the user is switched via 'su' or 'sudo', the environment is lost and the variables used to determine this are blank - by default, indicating being not in an SSH session.
+###/doc
+tty:is_ssh() {
+    [[ -n "${SSH_TTY:-}" ]] || [[ -n "${SSH_CLIENT:-}" ]] || [[ "${SSH_CONNECTION:-}" ]]
+}
+
+### tty:is_pipe Usage:bbuild
+# Determine if we are running in a pipe.
+###/doc
 tty:is_pipe() {
     [[ ! -t 1 ]]
 }
 
-##bash-libs: colours.sh @ bf310b32 (1.4.1)
+### tty:is_multiplexer Usage:bbuild
+# Determine if we are in a terminal multiplexer (detects 'screen' and 'tmux')
+###/doc
+tty:is_multiplexer() {
+    [[ -n "${TMUX:-}" ]] || [[ "${TERM:-}" = screen ]]
+}
+
+##bash-libs: colours.sh @ 27f043bc (2.1.15)
 
 ### Colours for terminal Usage:bbuild
 # A series of shorthand colour flags for use in outputs, and functions to set your own flags.
@@ -110,7 +252,21 @@ colours:set() {
     if [[ "$COLOURS_ON" = false ]]; then
         return 0
     else
-        echo -e "\033[${1}m"
+        echo -en "\033[${1}m"
+    fi
+}
+
+### colours:pipe CODE Usage:bbuild
+#
+# Prints a colourisation byte sequence using the provided number, then writes the pipe stream, and then writes a reset sequence (default is '0' to reset colours).
+#
+###/doc
+colours:pipe() {
+    . <(args:use:local colourint ?reset -- "$@") ; 
+    if [[ "$COLOURS_ON" = true ]]; then
+        colours:set "$colourint"
+        cat -
+        colours:set "${reset:-0}"
     fi
 }
 
@@ -178,7 +334,7 @@ colours:auto() {
 
 colours:auto
 
-##bash-libs: out.sh @ bf310b32 (1.4.1)
+##bash-libs: out.sh @ 27f043bc (2.1.15)
 
 ### Console output handlers Usage:bbuild
 #
@@ -265,8 +421,79 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
+##bash-libs: patterns.sh @ 27f043bc (2.1.15)
 
-##bash-libs: autohelp.sh @ bf310b32 (1.4.1)
+### Useful patterns Usage:bbuild
+#
+# Some useful regex patterns, exported as environment variables.
+#
+# They are not foolproof, and you are encouraged to improve upon them.
+#
+# $PAT_blank - detects whether an entire line is empty or whitespace
+# $PAT_comment - detects whether is a line is a script comment (assumes '#' as the comment marker)
+# $PAT_num - detects whether the string is an integer number in its entirety
+# $PAT_cvar - detects if the string is a valid C variable name
+# $PAT_filename - detects if the string is a safe UNIX or Windows file name;
+#   does not allow presence of special characters aside from '_', '.', and '-'
+# $PAT_email - simple heuristic to determine whether a string looks like a valid email address
+#
+###/doc
+
+export PAT_blank='^\s*$'
+export PAT_comment='^\s*(#.*)?$'
+export PAT_num='^[0-9]+$'
+export PAT_cvar='^[a-zA-Z_][a-zA-Z0-9_]*$'
+export PAT_filename='^[a-zA-Z0-9_. -]+$'
+export PAT_email="[a-zA-Z0-9_.+-]+@[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-z]+"
+
+### Formatting library Usage:bbuild
+#
+# Some convenience functions for formatting output.
+#
+###/doc
+
+### format:columns [SEP] Usage:bbuild
+#
+# Redirect input or pipe into this function to print columns using separator
+#  (default is tab character).
+#
+# Each line is split along the separator characters (each individual character is a
+#  separator, and the column widths are adjusted to the widest member of all rows.
+#
+# e.g.
+#
+#    format:columns ':' < /etc/passwd
+#
+#    grep January report.tsv | format:column
+#
+###/doc
+
+format:columns() {
+    . <(args:use:local ?sep -- "$@") ; 
+    [[ -n "$sep" ]] || sep=$'\t'
+
+    column -t -s "$sep"
+}
+
+### format:wrap Usage:bbuild
+#
+# Pipe or redirect into this function to soft-wrap text along spaces to terminal
+#  width, or specified width.
+#
+# e.g.
+#
+#   format:wrap 40 < README.md
+#
+###/doc
+
+format:wrap() {
+    . <(args:use:local ?cols -- "$@") ; 
+    [[ -n "$cols" ]] || cols="$(tput cols)"
+    [[ "$cols" =~ $PAT_num ]] || return 1
+    fold -w "$cols" -s
+}
+
+##bash-libs: autohelp.sh @ 27f043bc (2.1.15)
 
 ### Autohelp Usage:bbuild
 #
@@ -320,7 +547,7 @@ function out:error {
 #
 # Example usage in a multi-function script:
 #
-#   #!/bin/bash
+#   #!usr/bin/env bash
 #
 #   ### Main help Usage:help
 #   # The main help
@@ -331,7 +558,7 @@ function out:error {
 #   ###/doc
 #
 #   feature1() {
-#       autohelp:check_section feature_1 "$@"
+#       autohelp:check:section feature_1 "$@"
 #       echo "Feature I"
 #   }
 #
@@ -340,26 +567,17 @@ function out:error {
 #   ###/doc
 #
 #   feature2() {
-#       autohelp:check_section feature_2 "$@"
+#       autohelp:check:section feature_2 "$@"
 #       echo "Feature II"
 #   }
 #
 #   main() {
-#       if [[ -z "$*" ]]; then
-#           ### No command specified Usage:no-command
-#           #No command specified. Try running with `--help`
-#           ###/doc
-#
-#           autohelp:print no-command
-#           exit 1
-#       fi
-#
 #       case "$1" in
 #       feature1|feature2)
 #           "$1" "$@"            # Pass the global script arguments through
 #           ;;
 #       *)
-#           autohelp:check "$@"  # Check if main help was asked for, if so, exits
+#           autohelp:check-no-null "$@"  # Check if main help was asked for, if so, or if no args, exit with help
 #
 #           # Main help not requested, return error
 #           echo "Unknown feature"
@@ -382,13 +600,11 @@ function out:error {
 HELPCHAR='#'
 
 autohelp:print() {
+    . <(args:use:local ?section_string ?target_file -- "$@") ; 
     local input_line
-    local section_string="${1:-}"; shift || :
-    local target_file="${1:-}"; shift || :
     [[ -n "$section_string" ]] || section_string=help
     [[ -n "$target_file" ]] || target_file="$0"
 
-    #echo -e "\n$(basename "$target_file")\n===\n"
     local sec_start='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$section_string"'\s*$'
     local sec_end='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s*/doc\s*$'
     local in_section=false
@@ -422,32 +638,147 @@ autohelp:paged() {
     autohelp:print "$@" | $PAGER
 }
 
+### autohelp:check-or-null ARGS ... Usage:bbuild
+# Print help if arguments are empty, or if arguments contain a '--help' token
+#
+###/doc
+autohelp:check-or-null() {
+    if [[ -z "$*" ]]; then
+        autohelp:print help "$0"
+        exit 0
+    else
+        autohelp:check:section "help" "$@"
+    fi
+}
+
+### autohelp:check-or-null:section SECTION ARGS ... Usage:bbuild
+# Print help section SECTION if arguments are empty, or if arguments contain a '--help' token
+#
+###/doc
+autohelp:check-or-null:section() {
+    . <(args:use:local section -- "$@") ; 
+    if [[ -z "$*" ]]; then
+        autohelp:print "$section" "$0"
+        exit 0
+    else
+        autohelp:check:section "$section" "$@"
+    fi
+}
+
 ### autohelp:check ARGS ... Usage:bbuild
 #
 # Automatically print "help" sections and exit, if "--help" is detected in arguments
 #
 ###/doc
 autohelp:check() {
-    autohelp:check_section "help" "$@"
+    autohelp:check:section "help" "$@"
 }
 
-### autohelp:check_section SECTION ARGS ... Usage:bbuild
+### autohelp:check:section SECTION ARGS ... Usage:bbuild
 # Automatically print documentation for named section and exit, if "--help" is detected in arguments
 #
 ###/doc
-autohelp:check_section() {
+autohelp:check:section() {
     local section arg
     section="${1:-}"; shift || out:fail "No help section specified"
 
     for arg in "$@"; do
         if [[ "$arg" =~ --help ]]; then
-            cols="$(tput cols)"
-            autohelp:print "$section" | fold -w "$cols" -s || autohelp:print "$section"
+            autohelp:print "$section" | format:wrap
             exit 0
         fi
     done
 }
-##bash-libs: runmain.sh @ bf310b32 (1.4.1)
+##bash-libs: abspath.sh @ 27f043bc (2.1.15)
+
+### abspath:path RELATIVEPATH [ MAX ] Usage:bbuild
+# Returns the absolute path of a file/directory
+#
+# MAX defines the maximum number of "../" relative items to process
+#   default is 50
+###/doc
+
+function abspath:path {
+    local workpath="$1" ; shift || :
+    local max="${1:-50}" ; shift || :
+
+    if [[ "${workpath:0:1}" != "/" ]]; then workpath="$PWD/$workpath"; fi
+
+    workpath="$(abspath:collapse "$workpath")"
+    abspath:resolve_dotdot "$workpath" "$max" | sed -r 's|(.)/$|\1|'
+}
+
+function abspath:collapse {
+    echo "$1" | sed -r 's|/\./|/|g ; s|/\.$|| ; s|/+|/|g'
+}
+
+function abspath:resolve_dotdot {
+    local workpath="$1"; shift || :
+    local max="$1"; shift || :
+
+    # Set a limit on how many iterations to perform
+    # Only very obnoxious paths should fail
+    local obnoxious_counter
+    for obnoxious_counter in $(seq 1 $max); do
+        # No more dot-dots - good to go
+        if [[ ! "$workpath" =~ /\.\.(/|$) ]]; then
+            echo "$workpath"
+            return 0
+        fi
+
+        # Starts with an up-one at root - unresolvable
+        if [[ "$workpath" =~ ^/\.\.(/|$) ]]; then
+            return 1
+        fi
+
+        workpath="$(echo "$workpath"|sed -r 's@[^/]+/\.\.(/|$)@@')"
+    done
+
+    # A very obnoxious path was used.
+    return 2
+}
+
+##bash-libs: this.sh @ 27f043bc (2.1.15)
+
+### this: Info about the current command Usage:bbuild
+#
+# Get information about the current running app.
+#
+# Additional to the documented functions, there are three environment variables:
+#
+# * `THIS_basename` : the plain name of the currently running script
+# * `THIS_dirname` : the absolute path to the script's containing directory
+# * `THIS_scriptpath` : the absolute path to the script
+#
+###/doc
+
+### this:bin Usage:bbuild
+# The file name of the running script, without its path
+###/doc
+function this:bin {
+    if [[ -n "${BBRUN_SCRIPT:-}" ]]; then
+        basename "$BBRUN_SCRIPT"
+    else
+        basename "$0"
+    fi
+}
+
+### this:bindir Usage:bbuild
+# The absolute path of the directory in which the command is running
+###/doc
+function this:bindir {
+    if [[ -n "${BBRUN_SCRIPT:-}" ]]; then
+        dirname "$BBRUN_SCRIPT"
+    else
+        abspath:path "$(dirname "$0")"
+    fi
+}
+
+THIS_basename="$(this:bin)"
+THIS_dirname="$(this:bindir)"
+THIS_scriptpath="$THIS_dirname/$THIS_basename"
+
+##bash-libs: runmain.sh @ 27f043bc (2.1.15)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -455,7 +786,7 @@ autohelp:check_section() {
 # name of the script matches SCRIPTNAME
 #
 # This allows you include a main-like function in your library
-# that only runs if you use your lib as an executabl itself.
+# that only runs if you use your lib as an executable itself.
 #
 # For example, an image archiver could be:
 #
@@ -476,7 +807,7 @@ autohelp:check_section() {
 function runmain {
     local required_name="$1"; shift || :
     local funcall="$1"; shift || :
-    local scriptname="$(basename "$0")"
+    local scriptname="$THIS_basename"
 
     if [[ "$required_name" = "$scriptname" ]]; then
         "$funcall" "$@"

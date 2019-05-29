@@ -1,6 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-#%include out.sh bincheck.sh args.sh
+#%include std/out.sh
+#%include std/bincheck.sh
+#%include std/args.sh
 
 set -euo pipefail
 

@@ -1,4 +1,6 @@
-#%include searchpaths.sh out.sh vars.sh
+#%include std/searchpaths.sh
+#%include std/out.sh
+#%include std/vars.sh
 
 CERTMAKER_confpaths=".:$HOME/.config/certmaker:/etc/certmaker"
 

@@ -6,38 +6,191 @@ set -euo pipefail
 #
 # This script generates the subjectAlternate keys for a multi-host certificate.
 #
-#   generate-dns-alts.sh [ SUBDOMAIN ... ] [ -- SUFFIX ...]
-#
 # Specify the service names to generate DNS alt strings for on the command line
+#
+#   generate-dns-alts.sh OPTIONS
+#
+# OPTIONS
+#
+# -f,--suffixes SUFFIXCSV
+#   A comma-separated string of suffix values
+#
+# -b,--subdomains SUBDOMAINCSV
+#   A comma-separated string of subdomain values
+#
+# -c,--config FILE
+#   A config file, can be used instead of specifying -f and -b options
 #
 # Example:
 #
-#   generate-dns-alts.sh www store -- .example.com .domain.tld
+#   generate-dns-alts.sh -b www,store -f .example.com,.domain.tld
 #
 # CONFIG
 #
-# A config file in the working directory `dns-alts.conf` allows specifying two keys, `suffixes` and `subdomains`
+# A config file specified using the -c option allows specifying two keys, `suffixes` and `subdomains`
 #
 # Command line arguments will override the contents of this file
 #
 # Example:
 #
-#   subdomains = www store
-#   suffixes = .example.com .domain.tld
+#   subdomains=www,store
+#   suffixes=.example.com,.domain.tld
 #
 ###/doc
 
-##bash-libs: tty.sh @ bf310b32 (1.4.1)
 
-tty:is_ssh() {
-    [[ -n "$SSH_TTY" ]] || [[ -n "$SSH_CLIENT" ]] || [[ "$SSH_CONNECTION" ]]
+##bash-libs: syntax-extensions.sh @ 27f043bc (2.1.15)
+
+### Syntax Extensions Usage:syntax
+#
+# Syntax extensions for bash-builder.
+#
+# You will need to import this library if you use Bash Builder's extended syntax macros.
+#
+# You should not however use the functions directly, but the extended syntax instead.
+#
+##/doc
+
+### syntax-extensions:use FUNCNAME ARGNAMES ... Usage:syntax
+#
+# Consume arguments into named global variables.
+#
+# If not enough argument values are found, the first named variable that failed to be assigned is printed as error
+#
+# ARGNAMES prefixed with '?' do not trigger an error
+#
+# Example:
+#
+#   #%include std/out.sh
+#   #%include std/syntax-extensions.sh
+#
+#   get_parameters() {
+#       . <(syntax-extensions:use get_parameters INFILE OUTFILE ?comment -- "$@")
+#
+#       [[ -f "$INFILE" ]]  || out:fail "Input file '$INFILE' does not exist"
+#       [[ -f "$OUTFILE" ]] || out:fail "Output file '$OUTFILE' does not exist"
+#
+#       [[ -z "$comment" ]] || echo "Note: $comment"
+#   }
+#
+#   main() {
+#       get_parameters "$@"
+#
+#       echo "$INFILE will be converted to $OUTFILE"
+#   }
+#
+#   main "$@"
+#
+###/doc
+syntax-extensions:use() {
+    local argname arglist undef_f dec_scope argidx argone failmsg pos_ok
+    
+    dec_scope=""
+    [[ "${SYNTAXLIB_scope:-}" = local ]] || dec_scope=g
+    arglist=(:)
+    argone=\"\${1:-}\"
+    pos_ok=true
+    
+    for argname in "$@"; do
+        [[ "$argname" != -- ]] || break
+        [[ "$argname" =~ ^(\?|\*)?[0-9a-zA-Z_]+$ ]] || out:fail "Internal: Not a valid argument name '$argname'"
+
+        arglist+=("$argname")
+    done
+
+    argidx=1
+    while [[ "$argidx" -lt "${#arglist[@]}" ]]; do
+        argname="${arglist[$argidx]}"
+        failmsg="\"Internal: could not get '$argname' in function arguments\""
+        posfailmsg="\"Internal: positional argument '$argname' encountered after optional argument(s)\""
+
+        if [[ "$argname" =~ ^\? ]]; then
+            echo "$SYNTAXLIB_scope ${argname:1}"
+            echo "${argname:1}=$argone; shift || :"
+            pos_ok=false
+
+        elif [[ "$argname" =~ ^\* ]]; then
+            if [[ "$pos_ok" = true ]]; then
+                echo "[[ '${argname:1}' != \"$argone\" ]] || out:fail \"Internal: Local name [${argname:1}] is the same is the name it tries to reference. Rename [$argname] (suggestion: [*p_${argname:1}])\""
+                echo "declare -n${dec_scope} ${argname:1}=$argone; shift || out:fail $failmsg"
+            else
+                echo "out:fail $posfailmsg"
+            fi
+
+        else
+            if [[ "$pos_ok" = true ]]; then
+                echo "$SYNTAXLIB_scope ${argname}"
+                echo "${argname}=$argone; shift || out:fail $failmsg"
+            else
+                echo "out:fail $posfailmsg"
+            fi
+        fi
+
+        argidx=$((argidx + 1))
+    done
 }
 
+
+### syntax-extensions:use:local FUNCNAME ARGNAMES ... Usage:syntax
+# 
+# Enables syntax macro: function signatures
+#   e.g. $%function func(var1 var2) { ... }
+#
+# Build with bbuild to leverage this function's use:
+#
+#   #%include out.sh
+#   #%include syntax-extensions.sh
+#
+#   $%function person(name email) {
+#       echo "$name <$email>"
+#
+#       # $1 and $2 have been consumed into $name and $email
+#       # The rest remains available in $* :
+#       
+#       echo "Additional notes: $*"
+#   }
+#
+#   person "Jo Smith" "jsmith@example.com" Some details
+#
+###/doc
+syntax-extensions:use:local() {
+    SYNTAXLIB_scope=local syntax-extensions:use "$@"
+}
+
+args:use:local() {
+    syntax-extensions:use:local "$@"
+}
+##bash-libs: tty.sh @ 27f043bc (2.1.15)
+
+### tty.sh Usage:bbuild
+# Get information on the current terminal session.
+###/doc
+
+### tty:is_ssh Usage:bbuild
+# Determine whether the TTY is an SSH session.
+#
+# WARNING: this only works for an SSH connection still in the "landing" account.
+# If the user is switched via 'su' or 'sudo', the environment is lost and the variables used to determine this are blank - by default, indicating being not in an SSH session.
+###/doc
+tty:is_ssh() {
+    [[ -n "${SSH_TTY:-}" ]] || [[ -n "${SSH_CLIENT:-}" ]] || [[ "${SSH_CONNECTION:-}" ]]
+}
+
+### tty:is_pipe Usage:bbuild
+# Determine if we are running in a pipe.
+###/doc
 tty:is_pipe() {
     [[ ! -t 1 ]]
 }
 
-##bash-libs: colours.sh @ bf310b32 (1.4.1)
+### tty:is_multiplexer Usage:bbuild
+# Determine if we are in a terminal multiplexer (detects 'screen' and 'tmux')
+###/doc
+tty:is_multiplexer() {
+    [[ -n "${TMUX:-}" ]] || [[ "${TERM:-}" = screen ]]
+}
+
+##bash-libs: colours.sh @ 27f043bc (2.1.15)
 
 ### Colours for terminal Usage:bbuild
 # A series of shorthand colour flags for use in outputs, and functions to set your own flags.
@@ -122,7 +275,21 @@ colours:set() {
     if [[ "$COLOURS_ON" = false ]]; then
         return 0
     else
-        echo -e "\033[${1}m"
+        echo -en "\033[${1}m"
+    fi
+}
+
+### colours:pipe CODE Usage:bbuild
+#
+# Prints a colourisation byte sequence using the provided number, then writes the pipe stream, and then writes a reset sequence (default is '0' to reset colours).
+#
+###/doc
+colours:pipe() {
+    . <(args:use:local colourint ?reset -- "$@") ; 
+    if [[ "$COLOURS_ON" = true ]]; then
+        colours:set "$colourint"
+        cat -
+        colours:set "${reset:-0}"
     fi
 }
 
@@ -190,7 +357,7 @@ colours:auto() {
 
 colours:auto
 
-##bash-libs: out.sh @ bf310b32 (1.4.1)
+##bash-libs: out.sh @ 27f043bc (2.1.15)
 
 ### Console output handlers Usage:bbuild
 #
@@ -277,8 +444,79 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
+##bash-libs: patterns.sh @ 27f043bc (2.1.15)
 
-##bash-libs: autohelp.sh @ bf310b32 (1.4.1)
+### Useful patterns Usage:bbuild
+#
+# Some useful regex patterns, exported as environment variables.
+#
+# They are not foolproof, and you are encouraged to improve upon them.
+#
+# $PAT_blank - detects whether an entire line is empty or whitespace
+# $PAT_comment - detects whether is a line is a script comment (assumes '#' as the comment marker)
+# $PAT_num - detects whether the string is an integer number in its entirety
+# $PAT_cvar - detects if the string is a valid C variable name
+# $PAT_filename - detects if the string is a safe UNIX or Windows file name;
+#   does not allow presence of special characters aside from '_', '.', and '-'
+# $PAT_email - simple heuristic to determine whether a string looks like a valid email address
+#
+###/doc
+
+export PAT_blank='^\s*$'
+export PAT_comment='^\s*(#.*)?$'
+export PAT_num='^[0-9]+$'
+export PAT_cvar='^[a-zA-Z_][a-zA-Z0-9_]*$'
+export PAT_filename='^[a-zA-Z0-9_. -]+$'
+export PAT_email="[a-zA-Z0-9_.+-]+@[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-z]+"
+
+### Formatting library Usage:bbuild
+#
+# Some convenience functions for formatting output.
+#
+###/doc
+
+### format:columns [SEP] Usage:bbuild
+#
+# Redirect input or pipe into this function to print columns using separator
+#  (default is tab character).
+#
+# Each line is split along the separator characters (each individual character is a
+#  separator, and the column widths are adjusted to the widest member of all rows.
+#
+# e.g.
+#
+#    format:columns ':' < /etc/passwd
+#
+#    grep January report.tsv | format:column
+#
+###/doc
+
+format:columns() {
+    . <(args:use:local ?sep -- "$@") ; 
+    [[ -n "$sep" ]] || sep=$'\t'
+
+    column -t -s "$sep"
+}
+
+### format:wrap Usage:bbuild
+#
+# Pipe or redirect into this function to soft-wrap text along spaces to terminal
+#  width, or specified width.
+#
+# e.g.
+#
+#   format:wrap 40 < README.md
+#
+###/doc
+
+format:wrap() {
+    . <(args:use:local ?cols -- "$@") ; 
+    [[ -n "$cols" ]] || cols="$(tput cols)"
+    [[ "$cols" =~ $PAT_num ]] || return 1
+    fold -w "$cols" -s
+}
+
+##bash-libs: autohelp.sh @ 27f043bc (2.1.15)
 
 ### Autohelp Usage:bbuild
 #
@@ -332,7 +570,7 @@ function out:error {
 #
 # Example usage in a multi-function script:
 #
-#   #!/bin/bash
+#   #!usr/bin/env bash
 #
 #   ### Main help Usage:help
 #   # The main help
@@ -343,7 +581,7 @@ function out:error {
 #   ###/doc
 #
 #   feature1() {
-#       autohelp:check_section feature_1 "$@"
+#       autohelp:check:section feature_1 "$@"
 #       echo "Feature I"
 #   }
 #
@@ -352,26 +590,17 @@ function out:error {
 #   ###/doc
 #
 #   feature2() {
-#       autohelp:check_section feature_2 "$@"
+#       autohelp:check:section feature_2 "$@"
 #       echo "Feature II"
 #   }
 #
 #   main() {
-#       if [[ -z "$*" ]]; then
-#           ### No command specified Usage:no-command
-#           #No command specified. Try running with `--help`
-#           ###/doc
-#
-#           autohelp:print no-command
-#           exit 1
-#       fi
-#
 #       case "$1" in
 #       feature1|feature2)
 #           "$1" "$@"            # Pass the global script arguments through
 #           ;;
 #       *)
-#           autohelp:check "$@"  # Check if main help was asked for, if so, exits
+#           autohelp:check-no-null "$@"  # Check if main help was asked for, if so, or if no args, exit with help
 #
 #           # Main help not requested, return error
 #           echo "Unknown feature"
@@ -394,13 +623,11 @@ function out:error {
 HELPCHAR='#'
 
 autohelp:print() {
+    . <(args:use:local ?section_string ?target_file -- "$@") ; 
     local input_line
-    local section_string="${1:-}"; shift || :
-    local target_file="${1:-}"; shift || :
     [[ -n "$section_string" ]] || section_string=help
     [[ -n "$target_file" ]] || target_file="$0"
 
-    #echo -e "\n$(basename "$target_file")\n===\n"
     local sec_start='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s+(.+?)\s+Usage:'"$section_string"'\s*$'
     local sec_end='^\s*'"$HELPCHAR$HELPCHAR$HELPCHAR"'\s*/doc\s*$'
     local in_section=false
@@ -434,151 +661,731 @@ autohelp:paged() {
     autohelp:print "$@" | $PAGER
 }
 
+### autohelp:check-or-null ARGS ... Usage:bbuild
+# Print help if arguments are empty, or if arguments contain a '--help' token
+#
+###/doc
+autohelp:check-or-null() {
+    if [[ -z "$*" ]]; then
+        autohelp:print help "$0"
+        exit 0
+    else
+        autohelp:check:section "help" "$@"
+    fi
+}
+
+### autohelp:check-or-null:section SECTION ARGS ... Usage:bbuild
+# Print help section SECTION if arguments are empty, or if arguments contain a '--help' token
+#
+###/doc
+autohelp:check-or-null:section() {
+    . <(args:use:local section -- "$@") ; 
+    if [[ -z "$*" ]]; then
+        autohelp:print "$section" "$0"
+        exit 0
+    else
+        autohelp:check:section "$section" "$@"
+    fi
+}
+
 ### autohelp:check ARGS ... Usage:bbuild
 #
 # Automatically print "help" sections and exit, if "--help" is detected in arguments
 #
 ###/doc
 autohelp:check() {
-    autohelp:check_section "help" "$@"
+    autohelp:check:section "help" "$@"
 }
 
-### autohelp:check_section SECTION ARGS ... Usage:bbuild
+### autohelp:check:section SECTION ARGS ... Usage:bbuild
 # Automatically print documentation for named section and exit, if "--help" is detected in arguments
 #
 ###/doc
-autohelp:check_section() {
+autohelp:check:section() {
     local section arg
     section="${1:-}"; shift || out:fail "No help section specified"
 
     for arg in "$@"; do
         if [[ "$arg" =~ --help ]]; then
-            cols="$(tput cols)"
-            autohelp:print "$section" | fold -w "$cols" -s || autohelp:print "$section"
+            autohelp:print "$section" | format:wrap
             exit 0
         fi
     done
 }
-##bash-libs: readkv.sh @ bf310b32 (1.4.1)
 
-### Key Value Pair Reader Usage:bbuild
+##bash-libs: config.sh @ 27f043bc (2.1.15)
+
+### config.sh Usage:bbuild
+# Read configuration from various locations.
 #
-# Read a value given the key, from a specified file
+# Declare multiple config file locations in increasing order of authority, and read values from all, keeping only the most authoritative value.
 #
 ###/doc
 
-### readkv KEY FILE [DEFAULT] Usage:bbuild
+### config:declare CONFIG FILES ... Usage:bbuild
 #
-# The KEY is the key in the file. A key is identified as starting at the beginning of a line, and ending at the first '=' character
+# Declare a set of config files, more general file first, then read values from each file in turn.
 #
-# The value starts immediately after the first '=' character.
+# Example config contents and variable declaration
 #
-# If no value is found, the DEFAULT value is returned, or an empty string
+#   # Example configuration file contents
+#
+#   echo -e "first=1\\nsecond=2\\nthird=3" > /etc/test.conf
+#   echo -e "second=two\\nthird=" > ./test.conf
+#
+#   # Declare the order to read values from
+#   # Later files have more authority over earlier files.
+#
+#   config:declare CONFS /etc/test.conf ./test.conf
 #
 ###/doc
 
-function readkv {
-    local thedefault thekey thefile
-    thekey="$1" ; shift
-    thefile="$1"; shift
 
-    if [[ -n "${1:-}" ]]; then
-        thedefault="$1"; shift || :
-    fi
+##bash-libs: debug.sh @ 27f043bc (2.1.15)
 
-    local res="$(readkv:meaningful_data "$thefile"|grep -E "^$thekey"'\s*='|sed -r "s/^$thekey"'\s*=\s*//')"
-    if [[ -z "$res" ]]; then
-        echo "${thedefault:-}"
+### Debug lib Usage:bbuild
+#
+# Debugging tools and functions.
+#
+# You need to activate debug mode using debug:activate command at the start of your script
+#  (or from whatever point you wish it to activate)
+#
+###/doc
+
+### Environment Variables Usage:bbuild
+#
+# DEBUG_mode : set to 'true' to enable debugging output
+#
+###/doc
+
+: ${DEBUG_mode=false}
+
+### debug:print MESSAGE Usage:bbuild
+# print a blue debug message to stderr
+# only prints if DEBUG_mode is set to "true"
+###/doc
+function debug:print {
+    [[ "$DEBUG_mode" = true ]] || return 0
+    echo "${CBBLU}DEBUG: $CBLU$*$CDEF" 1>&2
+}
+
+### debug:dump [MARKER] Usage:bbuild
+#
+# Pipe the data coming through stdin to stdout (as if it weren't there at all)
+#
+# If debug mode is on, *also* write the same data to stderr, each line preceded by MARKER
+#
+# Insert this function into pipes to see their output when in debugging mode
+#
+#   sed -r 's/linux|unix/*NIX/gi' myfile.txt | debug:dump | lprint
+#
+# Or use this to mask a command's output unless in debug mode
+#
+#   which binary 2>&1 | debug:dump
+#
+###/doc
+function debug:dump {
+    if [[ "$DEBUG_mode" = true ]]; then
+        local MARKER="${1:-DEBUG: }"; shift || :
+
+        cat - | sed -r "s/^/$MARKER/" | tee -a /dev/stderr | sed -r "s/^$MARKER//"
     else
-        echo "$res"
+        cat -
     fi
 }
 
-### readkv:require KEY FILE Usage:bbuild
+### debug:break MESSAGE Usage:bbuild
 #
-# Like readkv, but causes a failure if the file does not exist.
+# Add break points to a script
+#
+# Requires `DEBUG_mode` set to true
+#
+# When the script runs, the message is printed with a prompt, and execution pauses.
+#
+# Press return to continue execution.
+#
+# Type a variable name, with leading `$`, to dump it, e.g. `$myvar`
+#
+# Type a variable name, with leading `$`, followed by an assignment to change its value, e.g. `$myvar=new value`
+#  the new value will be seen by the script.
+#
+# Type 'env' to dump the current environment variables.
+#
+# Type `exit`, `quit` or `stop` to stop the program. If the breakpoint is in a subshell,
+#  execution from after the subshell will be resumed.
 #
 ###/doc
 
-function readkv:require {
-    if [[ -z "${2:-}" ]]; then
-        out:fail "No file specified to read [$*]"
-    fi
+function debug:break {
+    [[ "$DEBUG_mode" = true ]] || return 0
+    local reply
 
-    if [[ ! -f "$2" ]] ; then
-        out:fail "No such file $2 !"
-    fi
+    while true; do
+        read -p "${CRED}BREAKPOINT: $* >$CDEF " reply
+        if [[ "$reply" =~ quit|exit|stop ]]; then
+            echo "${CBRED}ABORT${CDEF}" >&2
+            exit 127
 
-    if ! head -n 1 "$2" > /dev/null; then
-        out:fail "Could not read $2"
-    fi
-    readkv "$@"
+        elif [[ "$reply" = env ]]; then
+            env |sed 's//^[/g' |debug:dump "--- "
+
+        elif [[ "$reply" =~ ^\$ ]]; then
+            debug:_break_dump "${reply:1}" || :
+
+        elif [[ -z "$reply" ]]; then
+            return 0
+        else
+            debug:print "'quit','exit' or 'stop' to abort; '\$varname' to see a variable's contents; '\$varname=new value' to assign a new value for run time; <Enter> to continue"
+        fi
+    done
 }
 
-### readkv:meaningful_data FILE Usage:bbuild
-# Dump the file contents, stripping meaningless data (empty lines and comment lines)
-###/doc
-readkv:meaningful_data() {
-    grep -v -P '^\s*(#.*)?$' "$1"
-}
+debug:_break_dump() {
+    local inspectable="$1"
+    local varname="$1"
+    local varval
 
-DNSALTS_config="dns-alts.conf"
-DNSALTS_suffixes=(:)
-DNSALTS_subdomains=(:)
-
-get_subdomains() {
-    local load_from_file=false
-
-    if [[ -n "$*" ]]; then
-        while [[ -n "${1:-}" ]] && [[ "$1" != -- ]]; do
-            DNSALTS_subdomains+=("$1")
-            shift
-        done
+    if [[ "$inspectable" =~ = ]]; then
+        varname="${inspectable%%=*}"
+        varval="${inspectable#*=}"
     fi
 
-    [[ -n "${DNSALTS_subdomains[@]:1}" ]] || load_from_file=true
+    [[ "$varname" =~ $PAT_cvar ]] || {
+        debug:print "${CRED}Invalid var name '$varname'"
+        return 1
+    }
 
-        
-    if [[ "$load_from_file" = true ]] && [[ -f "$DNSALTS_config" ]]; then
-        DNSALTS_subdomains+=($(readkv:require subdomains "$DNSALTS_config"))
-    fi
+    declare -n inspect="$varname"
 
-    [[ -n "${DNSALTS_subdomains[@]:1}" ]] || out:fail "No subdomains specified."
-}
-
-get_suffixes() {
-    local load_from_file=false
-    if [[ -n "$*" ]]; then
-        while [[ -n "${1:-}" ]] && [[ "$1" != -- ]]; do
-            shift
-        done
-        shift || load_from_file=true # final token "--"
-    fi
-
-    [[ -n "$*" ]] || load_from_file=true
-        
-    if [[ "$load_from_file" = true ]] && [[ -f "$DNSALTS_config" ]]; then
-        DNSALTS_suffixes+=($(readkv:require suffixes "$DNSALTS_config"))
+    if [[ "$inspectable" =~ = ]]; then
+        inspect="$varval"
     else
-        while [[ -n "${1:-}" ]]; do
-            DNSALTS_suffixes+=("$1")
-            shift
-        done
+        echo "$inspect"
+    fi
+}
+
+config:declare() {
+    . <(args:use:local *p_configname -- "$@") ; 
+    p_configname=("$@")
+}
+
+config:_read_value() {
+    . <(args:use:local key file -- "$@") ; 
+    [[ "$key" =~ $PAT_cvar ]] || out:fail "Invalid config key '$key' -- must match '$PAT_cvar'"
+    grep -P "^\\s*$key" "$file"|sed -r "s/^\\s*$key=//"| tail -n1
+}
+
+config:_has_key() {
+    . <(args:use:local key file -- "$@") ; 
+    config:_read_value "$key" "$file" >/dev/null
+}
+
+config:_foreach_read() {
+    . <(args:use:local configname key -- "$@") ; 
+    local cfile value res
+    declare -n p_configname="$configname"
+    res=1
+
+    [[ -n "${p_configname[*]:-}" ]] || out:fail "Config undefined [$configname]"
+
+    for cfile in "${p_configname[@]}"; do
+        if [[ -e "$cfile" ]]; then
+            if config:_has_key "$key" "$cfile"; then
+                res=0
+                value="$(config:_read_value "$key" "$cfile")" || res="$?"
+            fi
+        fi
+    done
+
+    echo "${value:-}"
+    return "$res"
+}
+
+### config:read CONFIG KEY [DEFAULT] Usage:bbuild
+#
+# If an earlier file specifies a value, and a later file doesn't, the earlier file's value is used
+#
+# If a later file specifies an empty value, it overrides an earlier file's non-empty definition.
+#
+# Example, with the config files above
+#
+#   config:read CONFS first
+#   # --> 1
+#
+#   config:read CONFS second
+#   # --> "two"
+#
+#   config:read CONFS third
+#   # --> (empty string)
+#
+#   config:read CONFS undefined_key
+#   # ------> ERROR
+#
+#   config:read CONFS undefined_key "some value"
+#   # --> "some value"
+#
+###/doc
+
+config:read() {
+    . <(args:use:local namespace key ?default -- "$@") ; 
+    local value res
+    res=0
+
+    value="$(config:_foreach_read "$namespace" "$key")" || res="$?"
+
+    if [[ "$res" != 0 ]] && [[ -z "$default" ]]; then
+        return 1
+    elif [[ -z "$value" ]]; then
+        echo "$default"
+    else
+        echo "$value"
+    fi
+}
+
+### config:load CONFIG Usage:bbuild
+#
+# Use `config:load CONFIG` to load all values into a global namespace
+#
+# Example usage
+#
+#   config:declare CONFS file1 file2 file3
+#
+#   config:load CONFS
+#   echo "$CONFS_second"
+#
+###/doc
+
+config:load() {
+    . <(args:use:local namespace -- "$@") ; 
+    local cfile value key keys
+    declare -n p_configname="$namespace"
+
+    for cfile in "${p_configname[@]}"; do
+        if [[ -e "$cfile" ]]; then
+            keys=($(grep -oP '^[a-zA-Z0-9_]+(?==)' "$cfile"))
+            for key in "${keys[@]}"; do
+                if config:_has_key "$key" "$cfile"; then
+                    value="$(config:_read_value "$key" "$cfile")" || continue
+                    . <(echo "${namespace}_${key}=\"$(echo "$value"|sed 's/"/\"/g')\"")
+                fi
+            done
+        fi
+    done
+}
+
+##bash-libs: strings.sh @ 27f043bc (2.1.15)
+
+### Strings library Usage:bbuild
+#
+# More advanced string manipulation functions.
+#
+###/doc
+
+### strings:join JOINER STRINGS ... Usage:bbuild
+#
+# Join multiple strings, separated by the JOINER string
+#
+# Write the joined string to stdout
+#
+###/doc
+
+strings:join() {
+    # joiner can be any string
+    local joiner="$1"; shift || :
+
+    # so we use an array to collect the token parts
+    local destring=(:)
+
+    for token in "$@"; do
+        destring[${#destring[@]}]="$joiner"
+        destring[${#destring[@]}]="$token"
+    done
+
+    local finalstring=""
+    # first remove holder token and initial join token
+    #   before iterating
+    for item in "${destring[@]:2}"; do
+        finalstring="${finalstring}${item}"
+    done
+    echo "$finalstring"
+}
+
+### strings:split *RETURN_ARRAY SPLITTER STRING Usage:bbuild
+#
+# Split a STRING along each instance of SPLITTER
+#
+# Write the result to the variable in RETURN_ARRAY (pass as name reference)
+#
+# e.g.
+#
+#   local my_array
+#
+#   strings:split my_array ":" "a:b c:d"
+#
+#   echo "${my_array[1]}" # --> "b c"
+#
+###/doc
+
+strings:split() {
+    . <(args:use:local *p_returnarray splitter string_to_split -- "$@") ; 
+    local items=(:)
+
+    while [[ -n "$string_to_split" ]]; do
+        if [[ ! "$string_to_split" =~ "${splitter}" ]]; then
+            items[${#items[@]}]="$string_to_split"
+            break
+        fi
+
+        local token="$(echo "$string_to_split"|sed -r "s${splitter}.*$")"
+        items+=("$token")
+        string_to_split="$(echo "$string_to_split"|sed "s^${token}${splitter}")"
+    done
+
+    p_returnarray=("${items[@]:1}")
+}
+
+##bash-libs: args.sh @ 27f043bc (2.1.15)
+
+### args Usage:bbuild
+#
+# An arguments handling utility.
+#
+# `args:has` can be used to determine if an exact token exists in the array of arguments
+#
+# `args:get` can be used to extract individual arguments from an array of arguments; it assumes any flag is to be followed by the actual sought token.
+# It follows the convention that short flags are followed by value token ("-s value", "-l value")
+#   but that long flags incorporate their value after an equals sign ("--short=value", "--long=value")
+#
+# `args:parse` provides a fuller argument parsing utility, detecting some basic types, and optionally alerting to when a an argument was not expected.
+# It assumes that both short and long flags are followed separately by their value token ("-s value", "--long value")
+#
+###/doc
+
+readonly ARGS_ERR_NaN=100
+readonly ARGS_ERR_unknown_flag=101
+readonly ARGS_ERR_missing_value=102
+readonly ARGS_ERR_unknown_token=103
+
+### args:get TOKEN ARGS ... Usage:bbuild
+#
+# Given a TOKEN, find the argument value
+#
+# Typically called with the parent's arguments
+#
+# 	args:get --key "$@"
+# 	args:get -k "$@"
+#
+# If TOKEN is an int, returns the argument at that index (starts at 1, negative numbers count from end backwards)
+#
+# If TOKEN starts with two dashes ("--"), expect the value to be supplied after an equal sign
+#
+# 	--token=desired_value
+#
+# If TOKEN starts with a single dash, and is a letter or a number, expect the value to be the following token
+#
+# 	-t desired_value
+#
+# Returns 1 if could not find anything appropriate.
+#
+###/doc
+
+args:get() {
+    local seek="$1"; shift || :
+
+    if [[ "$seek" =~ $PAT_num ]]; then
+        local arguments=("$@")
+
+        # Get the index starting at 1
+        local n=$((seek-1))
+        # but do not affect wrap-arounds
+        [[ "$n" -ge 0 ]] || n=$((n+1))
+
+        echo "${arguments[$n]}"
+
+    elif [[ "$seek" =~ ^--.+ ]]; then
+        args:_get_long "$seek" "$@"
+
+    elif [[ "$seek" =~ ^-[a-zA-Z0-9]$ ]]; then
+        args:_get_short "$seek" "$@"
+
+    else
+        return 1
+    fi
+}
+
+args:_get_short() {
+    local token="$1"; shift || :
+    while [[ -n "$*" ]]; do
+        local item="$1"; shift || :
+
+        if [[ "$item" = "$token" ]]; then
+            echo "$1"
+            return 0
+        fi
+    done
+    return 1
+}
+
+args:_get_long() {
+    local token="$1"; shift || :
+    local tokenpat="^$token=(.*)$"
+
+    for item in "$@"; do
+        if [[ "$item" =~ $tokenpat ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+### args:has TOKEN ARGS ... Usage:bbuild
+#
+# Determines whether TOKEN is present on its own in ARGS
+#
+# Typically called with the parent's arguments
+#
+# 	args:has thing "$@"
+#
+# Returns 0 on success for example
+#
+# 	args:has thing "one" "thing" "or" "another"
+#
+# Returns 1 on failure for example
+#
+# 	args:has thing "one thing" "or another"
+#
+# "one thing" is not a valid match for "thing" as a token.
+#
+###/doc
+
+args:has() {
+    local token="$1"; shift || :
+    for item in "$@"; do
+        if [[ "$token" = "$item" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+### args:quote ARGS ... Usage:bbuild
+#
+# Produce a single string with each argument. If the argument has whitespace, double-quotes are added. If the argument has double-quotes as part of its data, these are escaped.
+#
+###/doc
+args:quote() {
+    local argstring arg
+    argstring=""
+
+    for arg in "$@"; do
+        arg="$(echo -n "$arg" | sed -rz 's/"/\\"/g ; s/\n/\\n/g ; s/\r/\\r/g ; s/\t/\\t/g')"
+
+        if (echo "$arg" | grep -Pq '\s') || [[ -z "$arg" ]]; then
+            arg="\"${arg}\""
+        fi
+
+        argstring="$argstring $arg"
+    done
+
+    echo "${argstring:1}"
+}
+
+### args:parse *ARGSDEF *FLAGLESS ARGS ... Usage:bbuild
+#
+# Iterate over the supplied arguments, using an array of argument/variables definitions.
+#
+# ARGSDEF :
+#
+# This is an array of flag definitions. Each definition token comprises of three parts, separated by a colon ':':
+#
+# * type
+# * return name
+# * flags
+#
+# The return name is the literal name of a variable to return values to (by name reference)
+#
+# There are three defined types:
+#
+# * 'b' - the name reference is set to the string "true" if a relevant flag is found
+# * 's' - the name reference is set to the value of the string passed
+# * 'n' - the name reference is set to a numerical string if found
+#
+# Flags is a comma-separated list of flags that trigger a match.
+#
+# For 's' and 'n' parameters, it is always expected that the following token provide the value.
+# NOTE: this is different from args:get behaviour.
+#
+# FLAGLESS :
+#
+# The name of the variable into which to put the tokens that were found, but not attached to flags.
+# If the name "-" is passed, causes an error when a flagless token is found.
+#
+# For example:
+#
+#   #%include std/args.sh
+#
+#   docopy() {
+#       # Define locally to not cause args:parse to write global variables
+#       local args_def usebinary infile outfile bytes
+#
+#       args_def=(
+#           "b:usebinary:-b,--binary"
+#           "s:infile:-i,--input"
+#           "s:outfile:-o,--output"
+#           "n:bytes:-n"
+#       )
+#
+#       # Pass 'args_def' by name reference
+#       args:parse args_def - "$@"
+#
+#       echo "Copying from $infile to $outfile"
+#       if [[ "$usebinary" = true ]]; then
+#           echo "Using binary mode"
+#       fi
+#       if [[ -n "${bytes:-}" ]]; then
+#           echo "Limiting to $bytes bytes."
+#       fi
+#   }
+#
+#   # Prints text
+#   docopy --input infile.txt -o outfile.bin -b -n 5
+#
+#   # Fails (unknown flag '-x')
+#   docopy --input infile.txt -o outfile.bin -b -x
+#
+#
+#
+# UNKNOWN FLAGS
+#
+# By default, if args:parse finds a flag that was not declared, it will cause a filure exit. You can set an environment variable `ARGS_allow_unknown_flags=true` to bypass this.
+#
+###/doc
+args:parse() {
+    . <(args:use:local *a_argsdefs ?flagless_returnname -- "$@") ; 
+    local arg __argdef __type __name __flags __flagless
+
+    if [[ "$flagless_returnname" != "-" ]]; then
+        __flagless=(:)
+        declare -n p_flaglessreturn="$flagless_returnname"
     fi
 
-    [[ -n "${DNSALTS_suffixes[@]:1}" ]] || out:fail "No suffixes specified."
+    while [[ -n "$*" ]]; do
+        arg="$1"; shift
+
+        if [[ "$arg" =~ ^- ]]; then
+            if ! args:_get_argdef "$arg" "__argdef" "a_argsdefs" && [[ "${ARGS_allow_unknown_flags:-}" = true ]]; then
+                out:fail $ARGS_ERR_unknown_flag "Unknown flag '$arg'"
+            fi
+
+            args:_unpack_argdef __type __name __flags "$__argdef"
+
+            declare -n p_pointedvar="$__name"
+
+            if [[ "$__type" = b ]]; then
+                p_pointedvar=true
+            else
+                p_pointedvar="${1:-}"; shift || out:fail $ARGS_ERR_missing_value "Argument parse error - expected value for '$__name' (flag was '$arg')"
+            fi
+
+            if [[ "$__type" = n ]]; then
+                [[ "$p_pointedvar" =~ $PAT_num ]] || out:fail $ARGS_ERR_NaN "Argument parse error - expected number for '$__name' but got '$p_pointedvar'"
+            fi
+
+        elif [[ "$flagless_returnname" != "-" ]]; then
+            __flagless+=("$arg")
+
+        else
+            out:fail $ARGS_ERR_unknown_token "Unrecognized token: '$arg'"
+        fi
+    done
+
+    if [[ "$flagless_returnname" != "-" ]]; then
+        p_flaglessreturn="${__flagless[@]:1}"
+    fi
+}
+
+args:_get_argdef() {
+    . <(args:use:local flag *p_argdef *p_a_argsdefs -- "$@") ; 
+    local argdef_string flags
+
+    for argdef_string in "${p_a_argsdefs[@]}"; do
+        flags="${argdef_string##*:}"
+        if [[ "$flags" =~ (^|,)$flag(,|$) ]]; then
+            p_argdef="$argdef_string"
+            return 0
+        fi
+    done
+    return 1
+}
+
+args:_unpack_argdef() {
+    . <(args:use:local *p_type *p_name *p_flags argdef_string -- "$@") ; 
+    local a_argdef
+    strings:split a_argdef : "$argdef_string"
+    
+    p_type="${a_argdef[0]}"
+    p_name="${a_argdef[1]}"
+    p_flags="${a_argdef[2]}"
+
+    if [[ ! "$p_type" =~ ^s|b|n$ ]]; then
+        out:fail "Invalid type '$p_type' for '$p_name'"
+    fi
+}
+
+DNSALTS_config=""
+DNSALTS_suffixes=""
+DNSALTS_subdomains=""
+
+load_config() {
+    local settingname settingref
+
+    if [[ -n "$DNSALTS_config" ]]; then
+        config:declare DNSALTS "$DNSALTS_config"
+        [[ -n "$DNSALTS_suffixes" ]] || DNSALTS_suffixes="$(config:read DNSALTS suffixes)"
+        [[ -n "$DNSALTS_subdomains" ]] || DNSALTS_subdomains="$(config:read DNSALTS subdomains)"
+    fi
+}
+
+parse_arguments() {
+    debug:print "Parse args [$*]"
+    local argdef=(
+        "s:DNSALTS_suffixes:-f,--suffixes"
+        "s:DNSALTS_subdomains:-b,--subdomain"
+        "s:DNSALTS_config:-c,--config"
+        "b:DEBUG_mode:--debug"
+    )
+
+    args:parse argdef - "$@"
+}
+
+validate_options() {
+    debug:print "Validating options..."
+    [[ -n "$DNSALTS_suffixes" ]] || out:fail "No suffixes specified"
+    [[ -n "$DNSALTS_subdomains" ]] || out:fail "No subdomains specified"
+}
+
+split_options() {
+    debug:print "Splitting DNSALTS suffixes and subdomains"
+    strings:split DNSALTS_suffixes , "$DNSALTS_suffixes"
+    strings:split DNSALTS_subdomains , "$DNSALTS_subdomains"
+
+    debug:print "SUF: ${DNSALTS_suffixes[@]}"
+    debug:print "SUB: ${DNSALTS_subdomains[@]}"
 }
 
 main() {
     autohelp:check "$@"
 
-    get_suffixes "$@"
-    get_subdomains "$@"
+    parse_arguments "$@"
+    load_config
+    validate_options
+    split_options
 
     local i=1
 
-    for serv in "${DNSALTS_subdomains[@]:1}"; do
-        for suf in "${DNSALTS_suffixes[@]:1}"; do
+    for suf in "${DNSALTS_suffixes[@]}"; do
+        for serv in "${DNSALTS_subdomains[@]}"; do
             echo "DNS.${i} = ${serv}${suf}"
             i=$((i+1))
         done

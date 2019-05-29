@@ -1,4 +1,5 @@
-#%include out.sh
+#%include std/out.sh
+
 #%include quick.sh
 
 ### certmaker csr NAME [FQDN ...] Usage:makecsr

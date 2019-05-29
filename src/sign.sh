@@ -1,5 +1,8 @@
-#%include colours.sh askuser.sh
-#%include files.sh util.sh
+#%include std/colours.sh
+#%include std/askuser.sh
+
+#%include files.sh
+#%include util.sh
 
 ### CSR Signing Usage:sign
 #

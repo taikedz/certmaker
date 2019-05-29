@@ -1,4 +1,5 @@
-#%include colours.sh bincheck.sh
+#%include std/colours.sh
+#%include std/bincheck.sh
 
 ::() {
     [[ -n "$*" ]] || out:fail "No command specified"
