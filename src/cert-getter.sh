@@ -27,14 +27,21 @@ function argcheck {
     fi
 }
 
+::() {
+(
+    set -x
+    "$@"
+)
+}
+
 function view_cert {
     [[ -f "$1" ]] || out:fail "No such file [$1]"
 
     if grep -qP "BEGIN( NEW)? CERTIFICATE REQUEST" "$1"; then
-        openssl req -text -noout -verify -in "$1"
+        :: openssl req -text -noout -verify -in "$1"
 
     else
-        openssl x509 -text -noout -in "$1"
+        :: openssl x509 -text -noout -in "$1"
     fi
 }
 
@@ -46,7 +53,7 @@ function fetch_cert {
         return
     fi
 
-    echo | (set -x ; openssl s_client -servername "$domain" -connect "$connectstring" ) | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
+    echo | :: openssl s_client -servername "$domain" -connect "$connectstring" | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
 }
 
 function determine_port_from_scheme {
@@ -64,6 +71,8 @@ function determine_port_from_scheme {
         port=636 ;;
     ftps)
         port=990 ;;
+    rdp)
+        port=3389 ;;
     *)
         out:fail "Cannot extrapolate port for $scheme" ;;
     esac

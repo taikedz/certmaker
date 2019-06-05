@@ -16,7 +16,7 @@
 ###/doc
 
 
-##bash-libs: syntax-extensions.sh @ 27f043bc (2.1.15)
+##bash-libs: syntax-extensions.sh @ 1d3814ad (2.1.13)
 
 ### Syntax Extensions Usage:syntax
 #
@@ -137,7 +137,7 @@ syntax-extensions:use:local() {
 args:use:local() {
     syntax-extensions:use:local "$@"
 }
-##bash-libs: tty.sh @ 27f043bc (2.1.15)
+##bash-libs: tty.sh @ 1d3814ad (2.1.13)
 
 ### tty.sh Usage:bbuild
 # Get information on the current terminal session.
@@ -167,7 +167,7 @@ tty:is_multiplexer() {
     [[ -n "${TMUX:-}" ]] || [[ "${TERM:-}" = screen ]]
 }
 
-##bash-libs: colours.sh @ 27f043bc (2.1.15)
+##bash-libs: colours.sh @ 1d3814ad (2.1.13)
 
 ### Colours for terminal Usage:bbuild
 # A series of shorthand colour flags for use in outputs, and functions to set your own flags.
@@ -334,7 +334,7 @@ colours:auto() {
 
 colours:auto
 
-##bash-libs: out.sh @ 27f043bc (2.1.15)
+##bash-libs: out.sh @ 1d3814ad (2.1.13)
 
 ### Console output handlers Usage:bbuild
 #
@@ -421,7 +421,7 @@ function out:fail {
 function out:error {
     echo "${CBRED}ERROR: ${CRED}$*$CDEF" 1>&2
 }
-##bash-libs: patterns.sh @ 27f043bc (2.1.15)
+##bash-libs: patterns.sh @ 1d3814ad (2.1.13)
 
 ### Useful patterns Usage:bbuild
 #
@@ -493,7 +493,7 @@ format:wrap() {
     fold -w "$cols" -s
 }
 
-##bash-libs: autohelp.sh @ 27f043bc (2.1.15)
+##bash-libs: autohelp.sh @ 1d3814ad (2.1.13)
 
 ### Autohelp Usage:bbuild
 #
@@ -689,7 +689,7 @@ autohelp:check:section() {
         fi
     done
 }
-##bash-libs: abspath.sh @ 27f043bc (2.1.15)
+##bash-libs: abspath.sh @ 1d3814ad (2.1.13)
 
 ### abspath:path RELATIVEPATH [ MAX ] Usage:bbuild
 # Returns the absolute path of a file/directory
@@ -738,7 +738,7 @@ function abspath:resolve_dotdot {
     return 2
 }
 
-##bash-libs: this.sh @ 27f043bc (2.1.15)
+##bash-libs: this.sh @ 1d3814ad (2.1.13)
 
 ### this: Info about the current command Usage:bbuild
 #
@@ -778,7 +778,7 @@ THIS_basename="$(this:bin)"
 THIS_dirname="$(this:bindir)"
 THIS_scriptpath="$THIS_dirname/$THIS_basename"
 
-##bash-libs: runmain.sh @ 27f043bc (2.1.15)
+##bash-libs: runmain.sh @ 1d3814ad (2.1.13)
 
 ### runmain SCRIPTNAME FUNCTION [ARGUMENTS ...] Usage:bbuild
 #
@@ -822,14 +822,21 @@ function argcheck {
     fi
 }
 
+::() {
+(
+    set -x
+    "$@"
+)
+}
+
 function view_cert {
     [[ -f "$1" ]] || out:fail "No such file [$1]"
 
     if grep -qP "BEGIN( NEW)? CERTIFICATE REQUEST" "$1"; then
-        openssl req -text -noout -verify -in "$1"
+        :: openssl req -text -noout -verify -in "$1"
 
     else
-        openssl x509 -text -noout -in "$1"
+        :: openssl x509 -text -noout -in "$1"
     fi
 }
 
@@ -841,7 +848,7 @@ function fetch_cert {
         return
     fi
 
-    echo | (set -x ; openssl s_client -servername "$domain" -connect "$connectstring" ) | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
+    echo | :: openssl s_client -servername "$domain" -connect "$connectstring" | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > "$tmpcert" || out:fail "Could not connect to [$domain] on [$port]"
 }
 
 function determine_port_from_scheme {
@@ -859,6 +866,8 @@ function determine_port_from_scheme {
         port=636 ;;
     ftps)
         port=990 ;;
+    rdp)
+        port=3389 ;;
     *)
         out:fail "Cannot extrapolate port for $scheme" ;;
     esac

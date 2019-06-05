@@ -118,7 +118,9 @@ You can fetch the certificate of a live site using
 
     certmaker fetch URL
 
-Supported URLs include `https://`, `ldaps://` and `ftps://`
+Supported URLs include `https://`, `ldaps://`, `rdp://` and `ftps://`
+
+URL can also be `$server:$port` e.g. `myserver.example.local:1234`
 
 ###    `view`
 
